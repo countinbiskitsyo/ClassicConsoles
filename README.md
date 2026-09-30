@@ -1,5 +1,11 @@
 # 2A03
 
+**No install, no download, no setup. Open the site and start playing.**
+
+**▶ Use it here: https://countinbiskitsyo.github.io/ClassicConsoles/**
+
+---
+
 A browser emulator front end covering six systems in a single self-contained HTML file.
 
 The NES runs on an emulator written from scratch for this page. The other five
@@ -25,11 +31,14 @@ One remapping interface configures all of them.
 
 ## Running it
 
-Open the HTML file in a browser. That is the whole installation.
+Open [the live site](https://countinbiskitsyo.github.io/ClassicConsoles/) — nothing to install.
 
-It works straight from the filesystem, but two things are fetched over the
-network: the display font, and the core files for every tab except the NES. The
-NES tab needs no network at all.
+You can also download `index.html` and open it directly from your own machine;
+the file is entirely self-contained and needs no server.
+
+Two things are fetched over the network in either case: the display font, and
+the core files for every tab except the NES. The NES tab needs no network at
+all once the page has loaded.
 
 For a fully offline setup, see [Self-hosting the cores](#self-hosting-the-cores).
 
