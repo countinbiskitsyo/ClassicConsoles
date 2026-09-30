@@ -1,0 +1,100 @@
+# ---------------------------------------------------------------------------
+# Game dumps, BIOS images and saves must never be committed.
+#
+# The emulator itself is fine to publish. Game ROMs and console BIOS files are
+# copyrighted, and public repositories hosting them get takedown notices — and
+# sometimes lose the whole account. Git also keeps deleted files in history, so
+# a file committed once is still there after you delete it. Keep this file in
+# place from the very first commit.
+# ---------------------------------------------------------------------------
+
+# --- Nintendo
+*.nes
+*.fds
+*.unf
+*.unif
+*.sfc
+*.smc
+*.fig
+*.swc
+*.z64
+*.n64
+*.v64
+*.gb
+*.gbc
+*.gba
+*.nds
+
+# --- Sony
+*.cue
+*.bin
+*.img
+*.iso
+*.chd
+*.pbp
+*.ecm
+*.m3u
+*.mdf
+*.mds
+*.pkg
+
+# --- Atari
+*.a26
+*.a52
+*.a78
+*.lnx
+*.j64
+*.jag
+*.rom
+
+# --- Sega and others
+*.md
+*.gen
+*.smd
+*.sms
+*.gg
+*.32x
+*.cdi
+*.gdi
+!README.md
+!docs/*.md
+
+# --- Arcade romsets and any archive that might hold a dump
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+
+# --- BIOS and firmware
+*.bios
+bios/
+BIOS/
+firmware/
+scph*.*
+*.bin.ecm
+
+# --- Save data and save states
+*.sav
+*.srm
+*.state
+*.state[0-9]
+*.mcr
+*.mcd
+saves/
+states/
+
+# --- Self-hosted EmulatorJS core files
+# Cores are large and carry their own licences. Uncomment the next line only if
+# you have read those licences and intend to redistribute them.
+data/
+
+# --- Editor and OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+node_modules/
