@@ -1,0 +1,3154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2A03 — NES, SNES and N64</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:#0C0E15; --panel:#171B26; --panel-2:#1F2431; --hairline:#2E3543;
+    --plastic:#C3C1B6; --plastic-2:#AEACA1;
+    --amber:#EA9E22; --blue:#4240FF; --red:#B53120;
+    --ink:#C7CDDB; --ink-dim:#767F94;
+    --display:"Oswald","Arial Narrow","Helvetica Neue Condensed",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--void); color: var(--ink); font-family: var(--mono);
+         font-size: 13px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+         padding: 22px 16px 40px; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  header { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-family: var(--display); font-weight: 600; font-size: clamp(34px, 8vw, 58px);
+       letter-spacing: 0.14em; text-transform: uppercase; margin: 0; line-height: 0.95; color: #F2F4F9; }
+  h1 span { color: var(--amber); }
+  .tag { font-size: 12px; color: var(--ink-dim); max-width: 40ch; padding-bottom: 6px; }
+
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--hairline); margin-bottom: 24px; }
+  .tab { font-family: var(--display); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+         background: none; border: 1px solid transparent; border-bottom: none; color: var(--ink-dim);
+         padding: 9px 18px 8px; cursor: pointer; border-radius: 3px 3px 0 0; margin-bottom: -1px;
+         display: flex; align-items: center; gap: 8px; }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: #F2F4F9; background: var(--panel); border-color: var(--hairline); }
+  .tab:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+  .lamp { width: 6px; height: 6px; border-radius: 50%; background: #3A4152; }
+  .tab.active .lamp { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  .stage { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 26px; align-items: start; }
+  @media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
+
+  .tv { background: #000; border: 1px solid var(--hairline); border-radius: 3px; padding: 10px; position: relative; }
+  canvas { display: block; width: 100%; height: auto; aspect-ratio: 256/240;
+           image-rendering: pixelated; image-rendering: crisp-edges; background: #000; }
+  .tv::after { content: ""; position: absolute; inset: 10px; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.14) 0 1px, transparent 1px 3px);
+    mix-blend-mode: multiply; opacity: 0.55; }
+  .idle { position: absolute; inset: 10px; display: grid; place-content: center; text-align: center;
+          color: var(--ink-dim); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+          font-family: var(--display); pointer-events: none; }
+  body.loaded-nes #idle-nes { display: none; }
+
+  .strip-label { display: flex; justify-content: space-between; align-items: baseline;
+                 margin: 14px 0 6px; font-size: 10px; letter-spacing: 0.16em;
+                 text-transform: uppercase; color: var(--ink-dim); }
+  #palette { display: grid; grid-template-columns: repeat(32,1fr); gap: 2px; height: 26px; }
+  .swatch { background: #000; border-radius: 1px; }
+  .swatch-mirror { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); }
+
+  /* ---------- libretro frame ---------- */
+  .core-stage { background: #000; border: 1px solid var(--hairline); border-radius: 3px;
+                position: relative; aspect-ratio: 4/3; overflow: hidden; }
+  .ejs-frame { width: 100%; height: 100%; border: 0; display: block; }
+  .core-stage .idle { inset: 0; }
+  body.loaded-snes #idle-snes, body.loaded-n64 #idle-n64 { display: none; }
+  .ejs-status { margin-top: 12px; padding: 10px 12px; border-radius: 2px; font-size: 12px;
+                border: 1px solid var(--hairline); background: var(--panel); }
+  .ejs-status.wait { border-left: 3px solid var(--amber); }
+  .ejs-status.ok { border-left: 3px solid #45E082; }
+  .ejs-status.bad { border-left: 3px solid var(--red); background: #2A1512; color: #F0C4BC; }
+
+  /* ---------- cartridge slot ---------- */
+  .slot { background: linear-gradient(var(--plastic), var(--plastic-2));
+          border-radius: 4px 4px 2px 2px; padding: 16px 16px 14px; cursor: pointer;
+          border: none; width: 100%; text-align: left; display: block; color: #23241F;
+          font-family: var(--mono); transition: transform 120ms ease, box-shadow 120ms ease;
+          box-shadow: 0 6px 0 #8E8C82, 0 10px 22px rgba(0,0,0,0.45); }
+  .slot:hover, .slot.over { transform: translateY(-2px); box-shadow: 0 8px 0 #8E8C82, 0 14px 26px rgba(0,0,0,0.5); }
+  .slot:active { transform: translateY(3px); box-shadow: 0 3px 0 #8E8C82; }
+  .slot:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+  .slot .mouth { height: 12px; background: #15161A; border-radius: 2px;
+                 box-shadow: inset 0 3px 5px rgba(0,0,0,0.9); margin-bottom: 12px; }
+  .slot h2 { font-family: var(--display); font-weight: 600; text-transform: uppercase;
+             letter-spacing: 0.12em; font-size: 15px; margin: 0 0 2px; }
+  .slot p { margin: 0; font-size: 11px; color: #4C4C44; }
+
+  .card { background: var(--panel); border: 1px solid var(--hairline); border-radius: 3px;
+          padding: 14px 14px 16px; margin-top: 18px; }
+  .card h3 { font-family: var(--display); font-size: 11px; font-weight: 500; margin: 0 0 10px;
+             letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 12px; }
+  dt { color: var(--ink-dim); }
+  dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .rom { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.06em;
+         font-size: 17px; color: #F2F4F9; word-break: break-word; margin-bottom: 10px; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.ctl { font-family: var(--mono); font-size: 12px; color: var(--ink); background: var(--panel-2);
+    border: 1px solid var(--hairline); border-radius: 2px; padding: 7px 11px; cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease; }
+  button.ctl:hover:not(:disabled) { border-color: var(--amber); color: #fff; }
+  button.ctl:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.ctl:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  #btn-play { border-color: var(--amber); color: var(--amber); }
+  input[type=range] { width: 100%; accent-color: var(--amber); margin-top: 10px; }
+
+  .seg { display: flex; gap: 2px; margin-bottom: 12px; background: var(--panel-2);
+         border: 1px solid var(--hairline); border-radius: 2px; padding: 2px; }
+  .seg button { flex: 1; font-family: var(--mono); font-size: 11px; background: none; border: none;
+                color: var(--ink-dim); padding: 6px 4px; cursor: pointer; border-radius: 1px; }
+  .seg button.active { background: var(--hairline); color: #F2F4F9; }
+  .seg button:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+
+  .bind-row { display: grid; grid-template-columns: 82px 1fr auto; gap: 8px; align-items: center;
+              padding: 5px 0; border-bottom: 1px solid rgba(46,53,67,0.5); }
+  .bind-row:last-child { border-bottom: none; }
+  .bind-row b { font-weight: 400; color: var(--ink-dim); font-size: 12px; }
+  .bind-keys { display: flex; gap: 5px; flex-wrap: wrap; }
+  .kbd { font-family: var(--mono); font-size: 11px; color: #E7EAF1; background: #262B38;
+         border: 1px solid #3A4152; border-bottom-width: 2px; border-radius: 3px;
+         padding: 3px 7px; cursor: pointer; }
+  .kbd:hover { border-color: var(--red); color: #F3C8C1; }
+  .kbd:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .kbd-empty { color: var(--ink-dim); background: none; border-style: dashed;
+               border-bottom-width: 1px; cursor: default; }
+  .kbd-empty:hover { border-color: #3A4152; color: var(--ink-dim); }
+  .bind-add { padding: 5px 9px; font-size: 11px; }
+  .bind-add.listening { border-color: var(--amber); color: var(--amber); }
+  #bind-status { display: block; min-height: 2.4em; margin-top: 10px; font-size: 11px; color: var(--amber); }
+  .bind-hint, #bind-scope { font-size: 11px; color: var(--ink-dim); margin: 0 0 12px; }
+  #bind-scope { margin: 10px 0 0; }
+
+  #error { background: #2A1512; border: 1px solid var(--red); border-left: 3px solid var(--red);
+           color: #F0C4BC; padding: 11px 13px; border-radius: 2px; margin-top: 16px; font-size: 12px; }
+
+  .gamepad { display: none; margin-top: 22px; align-items: center; justify-content: space-between; gap: 20px; }
+  @media (hover: none) and (pointer: coarse) { .gamepad { display: flex; } }
+  .dpad { display: grid; grid-template-columns: repeat(3,54px); grid-template-rows: repeat(3,54px); }
+  .dpad div { background: #24262E; border: 1px solid var(--hairline); }
+  .dpad div.held { background: var(--amber); }
+  .dpad .blank { background: transparent; border: none; }
+  .dpad .c { background: #2D3038; border-radius: 3px; }
+  .ab { display: flex; gap: 16px; }
+  .ab div { width: 62px; height: 62px; border-radius: 50%; background: var(--red);
+            display: grid; place-content: center; font-family: var(--display); font-size: 22px;
+            color: #fff; user-select: none; -webkit-user-select: none; }
+  .ab div.held { background: var(--amber); color: #1A1206; }
+  .startsel { display: flex; flex-direction: column; gap: 10px; }
+  .startsel div { padding: 9px 14px; background: #24262E; border: 1px solid var(--hairline);
+                  border-radius: 12px; font-size: 11px; letter-spacing: 0.1em; text-align: center;
+                  text-transform: uppercase; user-select: none; -webkit-user-select: none; }
+  .startsel div.held { background: var(--amber); color: #1A1206; }
+
+  .mouth-disc { height: 6px; border-radius: 3px; }
+  .source-pick { margin: 14px 0 4px; }
+  .source-pick label { display: block; font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink-dim); margin-bottom: 5px; }
+  .source-pick select, .source-pick input { width: 100%; margin-bottom: 6px; }
+  .source-pick input[hidden] { display: none; }
+  /* fullscreen: fill the display, preserve aspect ratio, keep pixels crisp */
+  #tv-nes:fullscreen { padding: 0; border: none; display: grid; place-items: center;
+    width: 100vw; height: 100vh; background: #000; }
+  #tv-nes:fullscreen canvas { width: auto; height: 100vh; max-width: 100vw;
+    aspect-ratio: 256/240; object-fit: contain; }
+  #tv-nes:fullscreen::after { inset: 0; }
+  #tv-nes:fullscreen .idle { inset: 0; }
+  .core-stage:fullscreen { aspect-ratio: auto; width: 100vw; height: 100vh;
+    border: none; border-radius: 0; }
+  .core-stage:fullscreen .ejs-frame { width: 100%; height: 100%; }
+  #tv-nes:-webkit-full-screen { padding: 0; border: none; width: 100vw; height: 100vh; }
+  #tv-nes:-webkit-full-screen canvas { height: 100vh; width: auto; }
+  .core-stage:-webkit-full-screen { aspect-ratio: auto; width: 100vw; height: 100vh; }
+  .version-badge { font-family: var(--mono); font-size: 11px; color: var(--amber);
+    border: 1px solid var(--hairline); border-radius: 2px; padding: 2px 7px;
+    align-self: center; margin-bottom: 8px; letter-spacing: 0.04em; }
+  .stamp { color: var(--ink); }
+  .changelog-box { margin: 0 0 12px; }
+  .changelog-box summary { cursor: pointer; color: var(--amber); font-size: 11px;
+    letter-spacing: 0.12em; text-transform: uppercase; }
+  .changelog-box summary:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .log-row { display: grid; grid-template-columns: 42px 1fr; gap: 12px; padding: 6px 0;
+    border-bottom: 1px solid var(--hairline); font-size: 11px; }
+  .log-row:last-child { border-bottom: none; }
+  .log-row b { font-weight: 400; color: var(--ink-dim); }
+  .log-row.current b { color: var(--amber); }
+  .log-row.current span { color: var(--ink); }
+  .note code { color: var(--amber); font-size: 10px; }
+  .note { font-size: 11px; color: var(--ink-dim); margin: 14px 0 0; }
+  footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--hairline);
+           color: var(--ink-dim); font-size: 11px; max-width: 78ch; }
+  footer p { margin: 0 0 8px; }
+  .hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>2A<span>03</span></h1>
+    <span class="version-badge" id="version-badge">v—</span>
+    <p class="tag">Three consoles, one set of controls. The NES runs on an emulator written for this page; the SNES and N64 run on RetroArch cores.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="System">
+    <button class="tab active" role="tab" data-system="nes" aria-selected="true"><i class="lamp"></i>NES</button>
+    <button class="tab" role="tab" data-system="snes" aria-selected="false"><i class="lamp"></i>SNES</button>
+    <button class="tab" role="tab" data-system="n64" aria-selected="false"><i class="lamp"></i>N64</button>
+    <button class="tab" role="tab" data-system="psx" aria-selected="false"><i class="lamp"></i>PS1</button>
+    <button class="tab" role="tab" data-system="atari" aria-selected="false"><i class="lamp"></i>ATARI</button>
+    <button class="tab" role="tab" data-system="arcade" aria-selected="false"><i class="lamp"></i>ARCADE</button>
+  </div>
+
+  <!-- ============================================================ NES -->
+  <div data-panel="nes" role="tabpanel">
+    <div class="stage">
+      <main>
+        <div class="tv" id="tv-nes">
+          <canvas id="screen" width="256" height="240"></canvas>
+          <div class="idle" id="idle-nes">No cartridge inserted</div>
+        </div>
+        <div class="strip-label"><span>Palette RAM · $3F00–$3F1F</span><span>live</span></div>
+        <div id="palette" aria-hidden="true"></div>
+
+        <div class="gamepad">
+          <div class="dpad">
+            <div class="blank"></div><div data-btn="UP"></div><div class="blank"></div>
+            <div data-btn="LEFT"></div><div class="c"></div><div data-btn="RIGHT"></div>
+            <div class="blank"></div><div data-btn="DOWN"></div><div class="blank"></div>
+          </div>
+          <div class="startsel">
+            <div data-btn="SELECT">Select</div>
+            <div data-btn="START">Start</div>
+          </div>
+          <div class="ab"><div data-btn="B">B</div><div data-btn="A">A</div></div>
+        </div>
+
+        <p id="error" hidden></p>
+      </main>
+
+      <aside>
+        <button class="slot" id="slot" type="button">
+          <div class="mouth"></div>
+          <h2>Insert cartridge</h2>
+          <p>Drop a .nes file here, or tap to browse.</p>
+        </button>
+
+        <div class="card">
+          <h3>Cartridge</h3>
+          <div class="rom" id="rom-name">—</div>
+          <dl>
+            <dt>Mapper</dt><dd id="stat-mapper">—</dd>
+            <dt>PRG ROM</dt><dd id="stat-prg">—</dd>
+            <dt>CHR</dt><dd id="stat-chr">—</dd>
+            <dt>Mirroring</dt><dd id="stat-mirror">—</dd>
+            <dt>Battery</dt><dd id="stat-battery">—</dd>
+            <dt>Frames</dt><dd id="stat-frames">0</dd>
+          </dl>
+        </div>
+
+        <div class="card">
+          <h3>Console</h3>
+          <div class="row">
+            <button class="ctl" id="btn-play">Play</button>
+            <button class="ctl" id="btn-reset">Reset</button>
+            <button class="ctl" id="btn-mute" aria-pressed="false">Sound on</button>
+            <button class="ctl" id="btn-fullscreen">Fullscreen</button>
+            <button class="ctl" id="btn-shot">Screenshot</button>
+            <button class="ctl" id="btn-save" disabled>Download save</button>
+            <button class="ctl" id="btn-loadsave" disabled>Load save</button>
+          </div>
+          <input type="range" id="volume" min="0" max="100" value="35" aria-label="Volume">
+        </div>
+
+        <div id="controls-host-nes"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ============================================================ SNES -->
+  <div data-panel="snes" role="tabpanel" hidden>
+    <div class="stage">
+      <main>
+        <div class="core-stage" id="stage-snes">
+          <div id="frame-snes" style="width:100%;height:100%"></div>
+          <div class="idle" id="idle-snes">No cartridge inserted</div>
+        </div>
+        <p class="ejs-status" id="status-snes" role="status" aria-live="polite" hidden></p>
+        <p class="note">Runs the snes9x core, downloaded on first use and cached afterwards. If every source fails, your network is blocking them — switch sources above, or go fully offline: grab the EmulatorJS release, drop its <code>data</code> folder beside this file, pick Local, and serve the folder over http (<code>python -m http.server</code>) rather than opening it from file://. Save states and fullscreen live in the core's own toolbar at the bottom of the screen.</p>
+      </main>
+      <aside>
+        <button class="slot" id="slot-snes" type="button">
+          <div class="mouth"></div>
+          <h2>Insert cartridge</h2>
+          <p>Drop a .sfc or .smc file here, or tap to browse.</p>
+        </button>
+        <div class="card">
+          <h3>Cartridge</h3>
+          <div class="rom" id="romname-snes">—</div>
+          <dl>
+            <dt>Core</dt><dd>snes9x</dd>
+            <dt>Renderer</dt><dd>WebAssembly</dd>
+          </dl>
+          <div class="source-pick">
+            <label for="source-snes">Core source</label>
+            <select id="source-snes" class="ctl">
+              <option value="auto">Auto — try each in turn</option>
+              <option value="official">EmulatorJS CDN</option>
+              <option value="jsdelivr">jsDelivr mirror</option>
+              <option value="local">Local data/ folder</option>
+              <option value="custom">Custom path…</option>
+            </select>
+            <input type="text" id="custompath-snes" class="ctl" hidden
+                   placeholder="https://example.com/data/" aria-label="Custom core path">
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="ctl" id="relaunch-snes" disabled>Restart core</button>
+            <button class="ctl" id="fullscreen-snes">Fullscreen</button>
+            <button class="ctl" id="eject-snes">Eject</button>
+          </div>
+        </div>
+        <div id="controls-host-snes"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ============================================================ N64 -->
+  <div data-panel="n64" role="tabpanel" hidden>
+    <div class="stage">
+      <main>
+        <div class="core-stage" id="stage-n64">
+          <div id="frame-n64" style="width:100%;height:100%"></div>
+          <div class="idle" id="idle-n64">No cartridge inserted</div>
+        </div>
+        <p class="ejs-status" id="status-n64" role="status" aria-live="polite" hidden></p>
+        <p class="note">Runs the mupen64plus-next core, which needs WebGL2 and a reasonably quick machine — N64 emulation is far heavier than the other two tabs, and compatibility varies by game. The analogue stick is mapped to keys below; a real controller works better and is picked up automatically.</p>
+      </main>
+      <aside>
+        <button class="slot" id="slot-n64" type="button">
+          <div class="mouth"></div>
+          <h2>Insert cartridge</h2>
+          <p>Drop a .z64, .n64 or .v64 file here, or tap to browse.</p>
+        </button>
+        <div class="card">
+          <h3>Cartridge</h3>
+          <div class="rom" id="romname-n64">—</div>
+          <dl>
+            <dt>Core</dt><dd>mupen64plus</dd>
+            <dt>Renderer</dt><dd>WebGL2</dd>
+          </dl>
+          <div class="source-pick">
+            <label for="source-n64">Core source</label>
+            <select id="source-n64" class="ctl">
+              <option value="auto">Auto — try each in turn</option>
+              <option value="official">EmulatorJS CDN</option>
+              <option value="jsdelivr">jsDelivr mirror</option>
+              <option value="local">Local data/ folder</option>
+              <option value="custom">Custom path…</option>
+            </select>
+            <input type="text" id="custompath-n64" class="ctl" hidden
+                   placeholder="https://example.com/data/" aria-label="Custom core path">
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="ctl" id="relaunch-n64" disabled>Restart core</button>
+            <button class="ctl" id="fullscreen-n64">Fullscreen</button>
+            <button class="ctl" id="eject-n64">Eject</button>
+          </div>
+        </div>
+        <div id="controls-host-n64"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ============================================================ PlayStation -->
+  <div data-panel="psx" role="tabpanel" hidden>
+    <div class="stage">
+      <main>
+        <div class="core-stage" id="stage-psx">
+          <div id="frame-psx" style="width:100%;height:100%"></div>
+          <div class="idle" id="idle-psx">No disc inserted</div>
+        </div>
+        <p class="ejs-status" id="status-psx" role="status" aria-live="polite" hidden></p>
+        <p class="note">Runs the pcsx_rearmed core. Single-file images (<code>.chd</code>, <code>.pbp</code>, <code>.iso</code>) load directly. For a <code>.cue</code> with separate <code>.bin</code> tracks, select every file at once and they get bundled into one image automatically. A BIOS is optional — the core emulates one in software, though some games behave better with the real thing. None is included here.</p>
+      </main>
+      <aside>
+        <button class="slot" id="slot-psx" type="button">
+          <div class="mouth mouth-disc"></div>
+          <h2>Insert disc</h2>
+          <p>Drop a .chd or .pbp, or pick a .cue with its .bin tracks.</p>
+        </button>
+        <div class="card">
+          <h3>Disc</h3>
+          <div class="rom" id="romname-psx">—</div>
+          <dl>
+            <dt>Core</dt><dd>pcsx_rearmed</dd>
+            <dt>BIOS</dt><dd id="biosname-psx">Software</dd>
+          </dl>
+          <div class="source-pick">
+            <label for="source-psx">Core source</label>
+            <select id="source-psx" class="ctl">
+              <option value="auto">Auto — try each in turn</option>
+              <option value="official">EmulatorJS CDN</option>
+              <option value="jsdelivr">jsDelivr mirror</option>
+              <option value="local">Local data/ folder</option>
+              <option value="custom">Custom path…</option>
+            </select>
+            <input type="text" id="custompath-psx" class="ctl" hidden
+                   placeholder="https://example.com/data/" aria-label="Custom core path">
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="ctl" id="relaunch-psx" disabled>Restart core</button>
+            <button class="ctl" id="fullscreen-psx">Fullscreen</button>
+            <button class="ctl" id="biosbtn-psx">Load BIOS</button>
+            <button class="ctl" id="eject-psx">Eject</button>
+          </div>
+        </div>
+        <div id="controls-host-psx"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div data-panel="atari" role="tabpanel" hidden>
+    <div class="stage">
+      <main>
+        <div class="core-stage" id="stage-atari">
+          <div id="frame-atari" style="width:100%;height:100%"></div>
+          <div class="idle" id="idle-atari">No cartridge inserted</div>
+        </div>
+        <p class="ejs-status" id="status-atari" role="status" aria-live="polite" hidden></p>
+        <p class="note">Pick the machine above before loading — each Atari system runs on its own core, so a 2600 dump will not boot on the 7800 core. The 2600 and 7800 use a joystick with one or two buttons; the Lynx adds its two Option keys. The 5200's analogue stick and number pad are only partly expressible on a keyboard, so some 5200 games will want a real controller.</p>
+      </main>
+      <aside>
+        <button class="slot" id="slot-atari" type="button">
+          <div class="mouth"></div>
+          <h2>Insert cartridge</h2>
+          <p>Drop a cartridge dump here, or tap to browse.</p>
+        </button>
+        <div class="card">
+          <h3>Cartridge</h3>
+          <div class="rom" id="romname-atari">—</div>
+          <div class="source-pick">
+            <label for="machine-atari">Machine</label>
+            <select id="machine-atari" class="ctl">
+              <option value="a2600" selected>Atari 2600</option>
+              <option value="a5200">Atari 5200</option>
+              <option value="a7800">Atari 7800</option>
+              <option value="lynx">Atari Lynx</option>
+              <option value="jaguar">Atari Jaguar</option>
+            </select>
+          </div>
+          <dl>
+            <dt>Core</dt><dd id="corename-atari">—</dd>
+          </dl>
+          <div class="source-pick">
+            <label for="source-atari">Core source</label>
+            <select id="source-atari" class="ctl">
+              <option value="auto">Auto — try each in turn</option>
+              <option value="official">EmulatorJS CDN</option>
+              <option value="jsdelivr">jsDelivr mirror</option>
+              <option value="local">Local data/ folder</option>
+              <option value="custom">Custom path…</option>
+            </select>
+            <input type="text" id="custompath-atari" class="ctl" hidden
+                   placeholder="https://example.com/data/" aria-label="Custom core path">
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="ctl" id="relaunch-atari" disabled>Restart core</button>
+            <button class="ctl" id="fullscreen-atari">Fullscreen</button>
+            <button class="ctl" id="eject-atari">Eject</button>
+          </div>
+        </div>
+        <div id="controls-host-atari"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div data-panel="arcade" role="tabpanel" hidden>
+    <div class="stage">
+      <main>
+        <div class="core-stage" id="stage-arcade">
+          <div id="frame-arcade" style="width:100%;height:100%"></div>
+          <div class="idle" id="idle-arcade">No romset loaded</div>
+        </div>
+        <p class="ejs-status" id="status-arcade" role="status" aria-live="polite" hidden></p>
+        <p class="note">Arcade romsets are version-specific: a set has to match the core that reads it, so a zip built for MAME 2003-Plus generally will not run on FinalBurn Neo, or the other way round. If a game refuses to start, try the other machine above before assuming the file is bad. Leave romset zips zipped — the core reads the archive itself. Press Insert coin, then Start.</p>
+      </main>
+      <aside>
+        <button class="slot" id="slot-arcade" type="button">
+          <div class="mouth"></div>
+          <h2>Insert romset</h2>
+          <p>Drop a romset .zip here, or tap to browse.</p>
+        </button>
+        <div class="card">
+          <h3>Romset</h3>
+          <div class="rom" id="romname-arcade">—</div>
+          <div class="source-pick">
+            <label for="machine-arcade">Machine</label>
+            <select id="machine-arcade" class="ctl">
+              <option value="fbneo" selected>FinalBurn Neo</option>
+              <option value="mame2003">MAME 2003-Plus</option>
+            </select>
+          </div>
+          <dl>
+            <dt>Core</dt><dd id="corename-arcade">—</dd>
+          </dl>
+          <div class="source-pick">
+            <label for="source-arcade">Core source</label>
+            <select id="source-arcade" class="ctl">
+              <option value="auto">Auto — try each in turn</option>
+              <option value="official">EmulatorJS CDN</option>
+              <option value="jsdelivr">jsDelivr mirror</option>
+              <option value="local">Local data/ folder</option>
+              <option value="custom">Custom path…</option>
+            </select>
+            <input type="text" id="custompath-arcade" class="ctl" hidden
+                   placeholder="https://example.com/data/" aria-label="Custom core path">
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="ctl" id="relaunch-arcade" disabled>Restart core</button>
+            <button class="ctl" id="fullscreen-arcade">Fullscreen</button>
+            <button class="ctl" id="eject-arcade">Eject</button>
+          </div>
+        </div>
+        <div id="controls-host-arcade"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- the single controls editor, moved between panels as tabs change -->
+  <div class="card" id="controls-card">
+    <h3>Controls</h3>
+    <div class="seg" role="tablist" aria-label="Which controls to edit">
+      <button data-bindgroup="p1" class="active" role="tab" aria-selected="true">Player 1</button>
+      <button data-bindgroup="p2" role="tab" aria-selected="false">Player 2</button>
+      <button data-bindgroup="sys" role="tab" aria-selected="false">System</button>
+    </div>
+    <p class="bind-hint">Add key, then press the key you want. Click any key to remove it.</p>
+    <div id="bindings"></div>
+    <p id="bind-scope"></p>
+    <span id="bind-status" role="status" aria-live="polite"></span>
+    <div class="row">
+      <button class="ctl" id="btn-bind-reset">Restore defaults</button>
+      <button class="ctl" id="btn-bind-export">Save layout</button>
+      <button class="ctl" id="btn-bind-import">Load layout</button>
+    </div>
+  </div>
+
+  <footer>
+    <p class="stamp">Version <span id="version-stamp">—</span></p>
+    <details class="changelog-box">
+      <summary>Version history</summary>
+      <div id="changelog"></div>
+    </details>
+    <p>The NES tab emulates the 2A03 CPU, the 2C02 picture unit and all five audio channels, with mappers NROM, MMC1, UxROM, CNROM, MMC3, AxROM and GxROM. The SNES, N64 and PlayStation tabs run RetroArch cores through EmulatorJS, fetched from cdn.emulatorjs.org — those two tabs need an internet connection the first time each core is used.</p>
+    <p>Bring your own cartridge dumps; none are included, and ROMs you load stay in your browser. Control layouts download as files rather than being kept in the browser, so save the layout if you want it to survive a reload.</p>
+  </footer>
+
+  <input type="file" id="file" class="hidden-input" accept=".nes,application/octet-stream">
+  <input type="file" id="savefile" class="hidden-input" accept=".sav,application/octet-stream">
+  <input type="file" id="keyfile" class="hidden-input" accept=".json,application/json">
+  <input type="file" id="file-snes" class="hidden-input">
+  <input type="file" id="file-n64" class="hidden-input">
+  <input type="file" id="file-psx" class="hidden-input">
+  <input type="file" id="file-atari" class="hidden-input">
+  <input type="file" id="file-arcade" class="hidden-input">
+  <input type="file" id="bios-psx" class="hidden-input" accept=".bin,.BIN,application/octet-stream">
+</div>
+<script>
+// ---------------------------------------------------------------- build info
+// One source of truth: the page title, the on-screen badge and the changelog all
+// read from here, so a build can't claim to be a version it isn't.
+const BUILD = {
+  version: "8.1",
+  date: "28 August 2026",
+};
+
+// Newest first. Each entry is one line describing what changed.
+const CHANGELOG = [
+  ["8.1", "Atari and Arcade tabs. Each is a family panel with a machine picker: 2600, 5200, 7800, Lynx and Jaguar; FinalBurn Neo and MAME 2003-Plus."],
+  ["8.0", "PlayStation tab on the pcsx_rearmed core. Multi-file .cue/.bin discs are bundled automatically; optional BIOS loading."],
+  ["7.0", "Fullscreen on all three tabs (F key, rebindable). Wake lock permission passed to cores; harmless post-boot errors no longer reported as failures."],
+  ["6.0", "Core downloads fall back across three sources when one is unreachable, with a source picker and custom path per system."],
+  ["5.0", "Fixed a crash on hosts that ship a partial console object; console shimmed inside the core frames."],
+  ["4.0", "Gamepad polling degrades quietly where the API is blocked by permissions policy, instead of throwing."],
+  ["3.0", "SNES and N64 tabs running snes9x and mupen64plus cores; remapper extended to drive all three systems."],
+  ["2.0", "Remappable controls for both players plus system actions, saveable to a file. System tabs added."],
+  ["1.0", "NES emulator: 6502 CPU, 2C02 picture unit, all five audio channels, seven mappers."],
+];
+
+function applyBuildInfo() {
+  const tag = "v" + BUILD.version;
+  document.title = "2A03 " + tag + " — NES, SNES and N64";
+
+  const badge = document.getElementById("version-badge");
+  if (badge) {
+    badge.textContent = tag;
+    badge.title = "Built " + BUILD.date;
+  }
+  const stamp = document.getElementById("version-stamp");
+  if (stamp) stamp.textContent = tag + " · " + BUILD.date;
+
+  const log = document.getElementById("changelog");
+  if (log) {
+    log.innerHTML = "";
+    for (const [v, note] of CHANGELOG) {
+      const row = document.createElement("div");
+      row.className = "log-row" + (v === BUILD.version ? " current" : "");
+      const num = document.createElement("b");
+      num.textContent = "v" + v;
+      const txt = document.createElement("span");
+      txt.textContent = note;
+      row.appendChild(num);
+      row.appendChild(txt);
+      log.appendChild(row);
+    }
+  }
+}
+// ---------------------------------------------------------------- zip writer
+// PlayStation discs usually arrive as a .cue plus one or more .bin tracks, but a
+// core wants one file. Rather than making people zip things by hand, bundle the
+// selection here. Entries are stored uncompressed — disc images are already huge
+// and mostly incompressible, and stored entries keep this small and fast.
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// DOS timestamp format used by the zip spec
+function dosTime(d) {
+  return ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF;
+}
+function dosDate(d) {
+  return (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+}
+
+// files: [{ name, data: Uint8Array }] -> Uint8Array containing a valid zip
+function buildZip(files) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const time = dosTime(now), date = dosDate(now);
+
+  const entries = files.map(f => {
+    const name = enc.encode(f.name);
+    return { name, data: f.data, crc: crc32(f.data), offset: 0 };
+  });
+
+  let total = 0;
+  for (const e of entries) total += 30 + e.name.length + e.data.length;
+  let central = 0;
+  for (const e of entries) central += 46 + e.name.length;
+  const out = new Uint8Array(total + central + 22);
+  const view = new DataView(out.buffer);
+  let p = 0;
+
+  const u16 = (v) => { view.setUint16(p, v, true); p += 2; };
+  const u32 = (v) => { view.setUint32(p, v >>> 0, true); p += 4; };
+  const raw = (b) => { out.set(b, p); p += b.length; };
+
+  for (const e of entries) {
+    e.offset = p;
+    u32(0x04034B50);            // local file header
+    u16(20);                    // version needed
+    u16(0);                     // flags
+    u16(0);                     // method: stored
+    u16(time); u16(date);
+    u32(e.crc);
+    u32(e.data.length);         // compressed size
+    u32(e.data.length);         // uncompressed size
+    u16(e.name.length);
+    u16(0);                     // extra length
+    raw(e.name);
+    raw(e.data);
+  }
+
+  const centralStart = p;
+  for (const e of entries) {
+    u32(0x02014B50);            // central directory header
+    u16(20);                    // version made by
+    u16(20);                    // version needed
+    u16(0); u16(0);             // flags, method
+    u16(time); u16(date);
+    u32(e.crc);
+    u32(e.data.length);
+    u32(e.data.length);
+    u16(e.name.length);
+    u16(0); u16(0);             // extra, comment
+    u16(0);                     // disk number
+    u16(0);                     // internal attrs
+    u32(0);                     // external attrs
+    u32(e.offset);
+    raw(e.name);
+  }
+
+  // Measure the central directory before writing the trailer — reading `p` after
+  // the trailer has started would include the trailer's own bytes in the size.
+  const centralSize = p - centralStart;
+
+  u32(0x06054B50);              // end of central directory
+  u16(0); u16(0);
+  u16(entries.length); u16(entries.length);
+  u32(centralSize);
+  u32(centralStart);
+  u16(0);
+
+  return out;
+}
+// ---------------------------------------------------------------- 6502 core
+const IMP=0, ACC=1, IMM=2, ZP0=3, ZPX=4, ZPY=5, ABS=6, ABX=7, ABY=8, IND=9, IZX=10, IZY=11, REL=12;
+
+// [mnemonic, mode, cycles, addsPageCrossPenalty]
+const OPS = [
+["BRK",IMP,7,0],["ORA",IZX,6,0],["JAM",IMP,2,0],["SLO",IZX,8,0],["NOP",ZP0,3,0],["ORA",ZP0,3,0],["ASL",ZP0,5,0],["SLO",ZP0,5,0],
+["PHP",IMP,3,0],["ORA",IMM,2,0],["ASL",ACC,2,0],["ANC",IMM,2,0],["NOP",ABS,4,0],["ORA",ABS,4,0],["ASL",ABS,6,0],["SLO",ABS,6,0],
+["BPL",REL,2,0],["ORA",IZY,5,1],["JAM",IMP,2,0],["SLO",IZY,8,0],["NOP",ZPX,4,0],["ORA",ZPX,4,0],["ASL",ZPX,6,0],["SLO",ZPX,6,0],
+["CLC",IMP,2,0],["ORA",ABY,4,1],["NOP",IMP,2,0],["SLO",ABY,7,0],["NOP",ABX,4,1],["ORA",ABX,4,1],["ASL",ABX,7,0],["SLO",ABX,7,0],
+["JSR",ABS,6,0],["AND",IZX,6,0],["JAM",IMP,2,0],["RLA",IZX,8,0],["BIT",ZP0,3,0],["AND",ZP0,3,0],["ROL",ZP0,5,0],["RLA",ZP0,5,0],
+["PLP",IMP,4,0],["AND",IMM,2,0],["ROL",ACC,2,0],["ANC",IMM,2,0],["BIT",ABS,4,0],["AND",ABS,4,0],["ROL",ABS,6,0],["RLA",ABS,6,0],
+["BMI",REL,2,0],["AND",IZY,5,1],["JAM",IMP,2,0],["RLA",IZY,8,0],["NOP",ZPX,4,0],["AND",ZPX,4,0],["ROL",ZPX,6,0],["RLA",ZPX,6,0],
+["SEC",IMP,2,0],["AND",ABY,4,1],["NOP",IMP,2,0],["RLA",ABY,7,0],["NOP",ABX,4,1],["AND",ABX,4,1],["ROL",ABX,7,0],["RLA",ABX,7,0],
+["RTI",IMP,6,0],["EOR",IZX,6,0],["JAM",IMP,2,0],["SRE",IZX,8,0],["NOP",ZP0,3,0],["EOR",ZP0,3,0],["LSR",ZP0,5,0],["SRE",ZP0,5,0],
+["PHA",IMP,3,0],["EOR",IMM,2,0],["LSR",ACC,2,0],["ALR",IMM,2,0],["JMP",ABS,3,0],["EOR",ABS,4,0],["LSR",ABS,6,0],["SRE",ABS,6,0],
+["BVC",REL,2,0],["EOR",IZY,5,1],["JAM",IMP,2,0],["SRE",IZY,8,0],["NOP",ZPX,4,0],["EOR",ZPX,4,0],["LSR",ZPX,6,0],["SRE",ZPX,6,0],
+["CLI",IMP,2,0],["EOR",ABY,4,1],["NOP",IMP,2,0],["SRE",ABY,7,0],["NOP",ABX,4,1],["EOR",ABX,4,1],["LSR",ABX,7,0],["SRE",ABX,7,0],
+["RTS",IMP,6,0],["ADC",IZX,6,0],["JAM",IMP,2,0],["RRA",IZX,8,0],["NOP",ZP0,3,0],["ADC",ZP0,3,0],["ROR",ZP0,5,0],["RRA",ZP0,5,0],
+["PLA",IMP,4,0],["ADC",IMM,2,0],["ROR",ACC,2,0],["ARR",IMM,2,0],["JMP",IND,5,0],["ADC",ABS,4,0],["ROR",ABS,6,0],["RRA",ABS,6,0],
+["BVS",REL,2,0],["ADC",IZY,5,1],["JAM",IMP,2,0],["RRA",IZY,8,0],["NOP",ZPX,4,0],["ADC",ZPX,4,0],["ROR",ZPX,6,0],["RRA",ZPX,6,0],
+["SEI",IMP,2,0],["ADC",ABY,4,1],["NOP",IMP,2,0],["RRA",ABY,7,0],["NOP",ABX,4,1],["ADC",ABX,4,1],["ROR",ABX,7,0],["RRA",ABX,7,0],
+["NOP",IMM,2,0],["STA",IZX,6,0],["NOP",IMM,2,0],["SAX",IZX,6,0],["STY",ZP0,3,0],["STA",ZP0,3,0],["STX",ZP0,3,0],["SAX",ZP0,3,0],
+["DEY",IMP,2,0],["NOP",IMM,2,0],["TXA",IMP,2,0],["ANE",IMM,2,0],["STY",ABS,4,0],["STA",ABS,4,0],["STX",ABS,4,0],["SAX",ABS,4,0],
+["BCC",REL,2,0],["STA",IZY,6,0],["JAM",IMP,2,0],["SHA",IZY,6,0],["STY",ZPX,4,0],["STA",ZPX,4,0],["STX",ZPY,4,0],["SAX",ZPY,4,0],
+["TYA",IMP,2,0],["STA",ABY,5,0],["TXS",IMP,2,0],["SHS",ABY,5,0],["SHY",ABX,5,0],["STA",ABX,5,0],["SHX",ABY,5,0],["SHA",ABY,5,0],
+["LDY",IMM,2,0],["LDA",IZX,6,0],["LDX",IMM,2,0],["LAX",IZX,6,0],["LDY",ZP0,3,0],["LDA",ZP0,3,0],["LDX",ZP0,3,0],["LAX",ZP0,3,0],
+["TAY",IMP,2,0],["LDA",IMM,2,0],["TAX",IMP,2,0],["LXA",IMM,2,0],["LDY",ABS,4,0],["LDA",ABS,4,0],["LDX",ABS,4,0],["LAX",ABS,4,0],
+["BCS",REL,2,0],["LDA",IZY,5,1],["JAM",IMP,2,0],["LAX",IZY,5,1],["LDY",ZPX,4,0],["LDA",ZPX,4,0],["LDX",ZPY,4,0],["LAX",ZPY,4,0],
+["CLV",IMP,2,0],["LDA",ABY,4,1],["TSX",IMP,2,0],["LAS",ABY,4,1],["LDY",ABX,4,1],["LDA",ABX,4,1],["LDX",ABY,4,1],["LAX",ABY,4,1],
+["CPY",IMM,2,0],["CMP",IZX,6,0],["NOP",IMM,2,0],["DCP",IZX,8,0],["CPY",ZP0,3,0],["CMP",ZP0,3,0],["DEC",ZP0,5,0],["DCP",ZP0,5,0],
+["INY",IMP,2,0],["CMP",IMM,2,0],["DEX",IMP,2,0],["SBX",IMM,2,0],["CPY",ABS,4,0],["CMP",ABS,4,0],["DEC",ABS,6,0],["DCP",ABS,6,0],
+["BNE",REL,2,0],["CMP",IZY,5,1],["JAM",IMP,2,0],["DCP",IZY,8,0],["NOP",ZPX,4,0],["CMP",ZPX,4,0],["DEC",ZPX,6,0],["DCP",ZPX,6,0],
+["CLD",IMP,2,0],["CMP",ABY,4,1],["NOP",IMP,2,0],["DCP",ABY,7,0],["NOP",ABX,4,1],["CMP",ABX,4,1],["DEC",ABX,7,0],["DCP",ABX,7,0],
+["CPX",IMM,2,0],["SBC",IZX,6,0],["NOP",IMM,2,0],["ISB",IZX,8,0],["CPX",ZP0,3,0],["SBC",ZP0,3,0],["INC",ZP0,5,0],["ISB",ZP0,5,0],
+["INX",IMP,2,0],["SBC",IMM,2,0],["NOP",IMP,2,0],["SBC",IMM,2,0],["CPX",ABS,4,0],["SBC",ABS,4,0],["INC",ABS,6,0],["ISB",ABS,6,0],
+["BEQ",REL,2,0],["SBC",IZY,5,1],["JAM",IMP,2,0],["ISB",IZY,8,0],["NOP",ZPX,4,0],["SBC",ZPX,4,0],["INC",ZPX,6,0],["ISB",ZPX,6,0],
+["SED",IMP,2,0],["SBC",ABY,4,1],["NOP",IMP,2,0],["ISB",ABY,7,0],["NOP",ABX,4,1],["SBC",ABX,4,1],["INC",ABX,7,0],["ISB",ABX,7,0],
+];
+
+class CPU {
+  constructor(bus) {
+    this.bus = bus;
+    this.reset();
+  }
+  reset() {
+    this.a = 0; this.x = 0; this.y = 0; this.sp = 0xFD;
+    this.C=0; this.Z=0; this.I=1; this.D=0; this.V=0; this.N=0;
+    this.pc = this.rd16(0xFFFC);
+    this.cycles = 0;
+    this.stall = 0;
+    this.nmi = false;
+    this.irq = false;
+  }
+  rd(a){ return this.bus.cpuRead(a & 0xFFFF); }
+  wr(a,v){ this.bus.cpuWrite(a & 0xFFFF, v & 0xFF); }
+  rd16(a){ return this.rd(a) | (this.rd(a+1) << 8); }
+  // hardware bug: indirect JMP does not cross page
+  rd16bug(a){
+    const lo = this.rd(a);
+    const hi = this.rd((a & 0xFF00) | ((a + 1) & 0xFF));
+    return lo | (hi << 8);
+  }
+  push(v){ this.wr(0x100 | this.sp, v); this.sp = (this.sp - 1) & 0xFF; }
+  pop(){ this.sp = (this.sp + 1) & 0xFF; return this.rd(0x100 | this.sp); }
+  flags(){ return this.C | (this.Z<<1) | (this.I<<2) | (this.D<<3) | 0x20 | (this.V<<6) | (this.N<<7); }
+  setFlags(v){ this.C=v&1; this.Z=(v>>1)&1; this.I=(v>>2)&1; this.D=(v>>3)&1; this.V=(v>>6)&1; this.N=(v>>7)&1; }
+  setZN(v){ v &= 0xFF; this.Z = v===0?1:0; this.N = (v>>7)&1; }
+
+  triggerNMI(){ this.nmi = true; }
+  setIRQ(state){ this.irq = state; }
+
+  doInterrupt(vector, brk) {
+    this.push((this.pc >> 8) & 0xFF);
+    this.push(this.pc & 0xFF);
+    this.push(this.flags() | (brk ? 0x10 : 0x00));
+    this.I = 1;
+    this.pc = this.rd16(vector);
+    this.cycles += 7;
+  }
+
+  step() {
+    if (this.stall > 0) { this.stall--; this.cycles++; return 1; }
+    const startCycles = this.cycles;
+
+    if (this.nmi) { this.nmi = false; this.doInterrupt(0xFFFA, false); return this.cycles - startCycles; }
+    if (this.irq && !this.I) { this.doInterrupt(0xFFFE, false); return this.cycles - startCycles; }
+
+    const op = this.rd(this.pc);
+    const info = OPS[op];
+    const mode = info[1];
+    let cyc = info[2];
+    this.pc = (this.pc + 1) & 0xFFFF;
+
+    let addr = 0, crossed = false;
+    switch (mode) {
+      case IMP: case ACC: break;
+      case IMM: addr = this.pc; this.pc = (this.pc+1)&0xFFFF; break;
+      case ZP0: addr = this.rd(this.pc); this.pc=(this.pc+1)&0xFFFF; break;
+      case ZPX: addr = (this.rd(this.pc) + this.x) & 0xFF; this.pc=(this.pc+1)&0xFFFF; break;
+      case ZPY: addr = (this.rd(this.pc) + this.y) & 0xFF; this.pc=(this.pc+1)&0xFFFF; break;
+      case ABS: addr = this.rd16(this.pc); this.pc=(this.pc+2)&0xFFFF; break;
+      case ABX: { const b = this.rd16(this.pc); this.pc=(this.pc+2)&0xFFFF;
+                  addr = (b + this.x) & 0xFFFF; crossed = (b & 0xFF00) !== (addr & 0xFF00); break; }
+      case ABY: { const b = this.rd16(this.pc); this.pc=(this.pc+2)&0xFFFF;
+                  addr = (b + this.y) & 0xFFFF; crossed = (b & 0xFF00) !== (addr & 0xFF00); break; }
+      case IND: { const b = this.rd16(this.pc); this.pc=(this.pc+2)&0xFFFF; addr = this.rd16bug(b); break; }
+      case IZX: { const z = (this.rd(this.pc) + this.x) & 0xFF; this.pc=(this.pc+1)&0xFFFF;
+                  addr = this.rd(z) | (this.rd((z+1)&0xFF) << 8); break; }
+      case IZY: { const z = this.rd(this.pc); this.pc=(this.pc+1)&0xFFFF;
+                  const b = this.rd(z) | (this.rd((z+1)&0xFF) << 8);
+                  addr = (b + this.y) & 0xFFFF; crossed = (b & 0xFF00) !== (addr & 0xFF00); break; }
+      case REL: { let o = this.rd(this.pc); this.pc=(this.pc+1)&0xFFFF;
+                  if (o & 0x80) o -= 0x100; addr = (this.pc + o) & 0xFFFF; break; }
+    }
+    if (crossed && info[3]) cyc++;
+    this.cycles += cyc;
+    this.exec(info[0], mode, addr);
+    return this.cycles - startCycles;
+  }
+
+  branch(addr, cond) {
+    if (!cond) return;
+    this.cycles++;
+    if ((this.pc & 0xFF00) !== (addr & 0xFF00)) this.cycles++;
+    this.pc = addr;
+  }
+
+  compare(reg, v) {
+    const r = (reg - v) & 0x1FF;
+    this.C = reg >= v ? 1 : 0;
+    this.setZN(r & 0xFF);
+  }
+  adc(v) {
+    const r = this.a + v + this.C;
+    this.C = r > 0xFF ? 1 : 0;
+    this.V = (~(this.a ^ v) & (this.a ^ r) & 0x80) ? 1 : 0;
+    this.a = r & 0xFF;
+    this.setZN(this.a);
+  }
+  sbc(v) { this.adc((~v) & 0xFF); }
+
+  exec(name, mode, addr) {
+    const R = () => mode === ACC ? this.a : this.rd(addr);
+    const W = (v) => { if (mode === ACC) this.a = v & 0xFF; else this.wr(addr, v); };
+
+    switch (name) {
+      case "LDA": this.a = this.rd(addr); this.setZN(this.a); break;
+      case "LDX": this.x = this.rd(addr); this.setZN(this.x); break;
+      case "LDY": this.y = this.rd(addr); this.setZN(this.y); break;
+      case "STA": this.wr(addr, this.a); break;
+      case "STX": this.wr(addr, this.x); break;
+      case "STY": this.wr(addr, this.y); break;
+      case "TAX": this.x = this.a; this.setZN(this.x); break;
+      case "TAY": this.y = this.a; this.setZN(this.y); break;
+      case "TXA": this.a = this.x; this.setZN(this.a); break;
+      case "TYA": this.a = this.y; this.setZN(this.a); break;
+      case "TSX": this.x = this.sp; this.setZN(this.x); break;
+      case "TXS": this.sp = this.x; break;
+      case "PHA": this.push(this.a); break;
+      case "PHP": this.push(this.flags() | 0x10); break;
+      case "PLA": this.a = this.pop(); this.setZN(this.a); break;
+      case "PLP": this.setFlags(this.pop()); break;
+      case "AND": this.a &= this.rd(addr); this.setZN(this.a); break;
+      case "ORA": this.a |= this.rd(addr); this.setZN(this.a); break;
+      case "EOR": this.a ^= this.rd(addr); this.setZN(this.a); break;
+      case "BIT": { const v = this.rd(addr); this.Z = (this.a & v) === 0 ? 1 : 0;
+                    this.N = (v>>7)&1; this.V = (v>>6)&1; break; }
+      case "ADC": this.adc(this.rd(addr)); break;
+      case "SBC": this.sbc(this.rd(addr)); break;
+      case "CMP": this.compare(this.a, this.rd(addr)); break;
+      case "CPX": this.compare(this.x, this.rd(addr)); break;
+      case "CPY": this.compare(this.y, this.rd(addr)); break;
+      case "INC": { const v = (this.rd(addr)+1)&0xFF; this.wr(addr,v); this.setZN(v); break; }
+      case "DEC": { const v = (this.rd(addr)-1)&0xFF; this.wr(addr,v); this.setZN(v); break; }
+      case "INX": this.x = (this.x+1)&0xFF; this.setZN(this.x); break;
+      case "DEX": this.x = (this.x-1)&0xFF; this.setZN(this.x); break;
+      case "INY": this.y = (this.y+1)&0xFF; this.setZN(this.y); break;
+      case "DEY": this.y = (this.y-1)&0xFF; this.setZN(this.y); break;
+      case "ASL": { const v = R(); this.C = (v>>7)&1; const r=(v<<1)&0xFF; W(r); this.setZN(r); break; }
+      case "LSR": { const v = R(); this.C = v&1; const r=v>>1; W(r); this.setZN(r); break; }
+      case "ROL": { const v = R(); const c=this.C; this.C=(v>>7)&1; const r=((v<<1)|c)&0xFF; W(r); this.setZN(r); break; }
+      case "ROR": { const v = R(); const c=this.C; this.C=v&1; const r=(v>>1)|(c<<7); W(r); this.setZN(r); break; }
+      case "JMP": this.pc = addr; break;
+      case "JSR": { const r = (this.pc - 1) & 0xFFFF; this.push((r>>8)&0xFF); this.push(r&0xFF); this.pc = addr; break; }
+      case "RTS": { const lo=this.pop(), hi=this.pop(); this.pc = ((lo|(hi<<8)) + 1) & 0xFFFF; break; }
+      case "RTI": { this.setFlags(this.pop()); const lo=this.pop(), hi=this.pop(); this.pc = lo|(hi<<8); break; }
+      case "BRK": this.pc = (this.pc + 1) & 0xFFFF; this.doInterrupt(0xFFFE, true); this.cycles -= 7; break;
+      case "BCC": this.branch(addr, this.C===0); break;
+      case "BCS": this.branch(addr, this.C===1); break;
+      case "BEQ": this.branch(addr, this.Z===1); break;
+      case "BNE": this.branch(addr, this.Z===0); break;
+      case "BMI": this.branch(addr, this.N===1); break;
+      case "BPL": this.branch(addr, this.N===0); break;
+      case "BVC": this.branch(addr, this.V===0); break;
+      case "BVS": this.branch(addr, this.V===1); break;
+      case "CLC": this.C=0; break;
+      case "SEC": this.C=1; break;
+      case "CLI": this.I=0; break;
+      case "SEI": this.I=1; break;
+      case "CLD": this.D=0; break;
+      case "SED": this.D=1; break;
+      case "CLV": this.V=0; break;
+      case "NOP": if (mode !== IMP && mode !== ACC) this.rd(addr); break;
+      case "JAM": this.pc = (this.pc - 1) & 0xFFFF; break;
+      // ---- unofficial opcodes used by a handful of commercial games / test ROMs
+      case "LAX": this.a = this.rd(addr); this.x = this.a; this.setZN(this.a); break;
+      case "SAX": this.wr(addr, this.a & this.x); break;
+      case "DCP": { const v = (this.rd(addr)-1)&0xFF; this.wr(addr,v); this.compare(this.a, v); break; }
+      case "ISB": { const v = (this.rd(addr)+1)&0xFF; this.wr(addr,v); this.sbc(v); break; }
+      case "SLO": { let v = this.rd(addr); this.C=(v>>7)&1; v=(v<<1)&0xFF; this.wr(addr,v);
+                    this.a |= v; this.setZN(this.a); break; }
+      case "RLA": { let v = this.rd(addr); const c=this.C; this.C=(v>>7)&1; v=((v<<1)|c)&0xFF; this.wr(addr,v);
+                    this.a &= v; this.setZN(this.a); break; }
+      case "SRE": { let v = this.rd(addr); this.C=v&1; v=v>>1; this.wr(addr,v);
+                    this.a ^= v; this.setZN(this.a); break; }
+      case "RRA": { let v = this.rd(addr); const c=this.C; this.C=v&1; v=(v>>1)|(c<<7); this.wr(addr,v);
+                    this.adc(v); break; }
+      case "ANC": this.a &= this.rd(addr); this.setZN(this.a); this.C = (this.a>>7)&1; break;
+      case "ALR": this.a &= this.rd(addr); this.C = this.a&1; this.a >>= 1; this.setZN(this.a); break;
+      case "ARR": { this.a &= this.rd(addr); const c=this.C; this.C=this.a&1;
+                    this.a=(this.a>>1)|(c<<7); this.setZN(this.a);
+                    this.V = (((this.a>>6)^(this.a>>5))&1); break; }
+      case "SBX": { const v = this.rd(addr); const t = (this.a & this.x);
+                    this.C = t >= v ? 1 : 0; this.x = (t - v) & 0xFF; this.setZN(this.x); break; }
+      case "LXA": case "ANE": this.a = (this.a | 0xEE) & this.x & this.rd(addr); this.setZN(this.a); break;
+      case "LAS": { const v = this.rd(addr); this.sp &= v; this.a = this.x = this.sp; this.setZN(this.a); break; }
+      case "SHA": this.wr(addr, this.a & this.x & ((addr>>8)+1)); break;
+      case "SHX": this.wr(addr, this.x & ((addr>>8)+1)); break;
+      case "SHY": this.wr(addr, this.y & ((addr>>8)+1)); break;
+      case "SHS": this.sp = this.a & this.x; this.wr(addr, this.sp & ((addr>>8)+1)); break;
+      default: break;
+    }
+  }
+}
+// ---------------------------------------------------------------- cartridge
+const MIRROR_HORIZONTAL = 0, MIRROR_VERTICAL = 1, MIRROR_SINGLE0 = 2, MIRROR_SINGLE1 = 3, MIRROR_FOUR = 4;
+
+class Cartridge {
+  constructor(bytes) {
+    const d = new Uint8Array(bytes);
+    if (d[0]!==0x4E || d[1]!==0x45 || d[2]!==0x53 || d[3]!==0x1A)
+      throw new Error("Not an iNES file. Expected a .nes ROM (header missing).");
+
+    const prgBanks = d[4], chrBanks = d[5];
+    const f6 = d[6], f7 = d[7];
+    this.mapperNum = ((f7 & 0xF0) | (f6 >> 4)) >> 0;
+    this.mapperNum = (f6 >> 4) | (f7 & 0xF0);
+    this.battery = !!(f6 & 0x02);
+    this.mirroring = (f6 & 0x08) ? MIRROR_FOUR : ((f6 & 0x01) ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
+
+    let off = 16;
+    if (f6 & 0x04) off += 512;            // trainer
+
+    const prgSize = prgBanks * 16384;
+    const chrSize = chrBanks * 8192;
+    if (off + prgSize > d.length) throw new Error("ROM file is truncated.");
+
+    this.prg = d.slice(off, off + prgSize);
+    this.chr = chrSize > 0
+      ? d.slice(off + prgSize, off + prgSize + chrSize)
+      : new Uint8Array(8192);           // CHR RAM
+    this.usesChrRam = chrSize === 0;
+    this.prgRam = new Uint8Array(8192);
+    this.prgBanks = prgBanks;
+    this.chrBanks = chrBanks;
+  }
+}
+
+// ---------------------------------------------------------------- mappers
+class Mapper {
+  constructor(cart) { this.cart = cart; this.mirroring = cart.mirroring; this.irq = false; }
+  cpuRead(a) {
+    if (a >= 0x6000 && a < 0x8000) return this.cart.prgRam[a - 0x6000];
+    return 0;
+  }
+  cpuWrite(a, v) {
+    if (a >= 0x6000 && a < 0x8000) this.cart.prgRam[a - 0x6000] = v;
+  }
+  ppuRead(a) { return this.cart.chr[a & 0x1FFF]; }
+  ppuWrite(a, v) { if (this.cart.usesChrRam) this.cart.chr[a & 0x1FFF] = v; }
+  scanline() {}
+  clearIrq() { this.irq = false; }
+}
+
+// 0 — NROM
+class NROM extends Mapper {
+  cpuRead(a) {
+    if (a >= 0x8000) {
+      const mask = this.cart.prgBanks === 1 ? 0x3FFF : 0x7FFF;
+      return this.cart.prg[(a - 0x8000) & mask];
+    }
+    return super.cpuRead(a);
+  }
+}
+
+// 2 — UxROM
+class UxROM extends Mapper {
+  constructor(c) { super(c); this.bank = 0; this.last = c.prgBanks - 1; }
+  cpuRead(a) {
+    if (a >= 0xC000) return this.cart.prg[this.last * 0x4000 + (a - 0xC000)];
+    if (a >= 0x8000) return this.cart.prg[this.bank * 0x4000 + (a - 0x8000)];
+    return super.cpuRead(a);
+  }
+  cpuWrite(a, v) { if (a >= 0x8000) this.bank = v % this.cart.prgBanks; else super.cpuWrite(a, v); }
+}
+
+// 3 — CNROM
+class CNROM extends Mapper {
+  constructor(c) { super(c); this.chrBank = 0; }
+  cpuRead(a) {
+    if (a >= 0x8000) {
+      const mask = this.cart.prgBanks === 1 ? 0x3FFF : 0x7FFF;
+      return this.cart.prg[(a - 0x8000) & mask];
+    }
+    return super.cpuRead(a);
+  }
+  cpuWrite(a, v) { if (a >= 0x8000) this.chrBank = v & 0x03; else super.cpuWrite(a, v); }
+  ppuRead(a) { return this.cart.chr[(this.chrBank * 0x2000 + (a & 0x1FFF)) % this.cart.chr.length]; }
+}
+
+// 7 — AxROM
+class AxROM extends Mapper {
+  constructor(c) { super(c); this.bank = 0; this.mirroring = MIRROR_SINGLE0; }
+  cpuRead(a) {
+    if (a >= 0x8000) return this.cart.prg[(this.bank * 0x8000 + (a - 0x8000)) % this.cart.prg.length];
+    return super.cpuRead(a);
+  }
+  cpuWrite(a, v) {
+    if (a >= 0x8000) { this.bank = v & 0x07; this.mirroring = (v & 0x10) ? MIRROR_SINGLE1 : MIRROR_SINGLE0; }
+    else super.cpuWrite(a, v);
+  }
+}
+
+// 66 — GxROM
+class GxROM extends Mapper {
+  constructor(c) { super(c); this.prgBank = 0; this.chrBank = 0; }
+  cpuRead(a) {
+    if (a >= 0x8000) return this.cart.prg[(this.prgBank * 0x8000 + (a - 0x8000)) % this.cart.prg.length];
+    return super.cpuRead(a);
+  }
+  cpuWrite(a, v) {
+    if (a >= 0x8000) { this.prgBank = (v >> 4) & 0x03; this.chrBank = v & 0x03; }
+    else super.cpuWrite(a, v);
+  }
+  ppuRead(a) { return this.cart.chr[(this.chrBank * 0x2000 + (a & 0x1FFF)) % this.cart.chr.length]; }
+}
+
+// 1 — MMC1
+class MMC1 extends Mapper {
+  constructor(c) {
+    super(c);
+    this.shift = 0x10; this.control = 0x0C;
+    this.chrBank0 = 0; this.chrBank1 = 0; this.prgBank = 0;
+    this.updateMirroring();
+  }
+  updateMirroring() {
+    switch (this.control & 0x03) {
+      case 0: this.mirroring = MIRROR_SINGLE0; break;
+      case 1: this.mirroring = MIRROR_SINGLE1; break;
+      case 2: this.mirroring = MIRROR_VERTICAL; break;
+      case 3: this.mirroring = MIRROR_HORIZONTAL; break;
+    }
+  }
+  cpuRead(a) {
+    if (a >= 0x8000) {
+      const mode = (this.control >> 2) & 0x03;
+      const nb = this.cart.prgBanks;
+      let bank, off;
+      if (mode < 2) {                            // 32 KB
+        bank = (this.prgBank & 0x0E);
+        off = (bank * 0x4000 + (a - 0x8000)) % this.cart.prg.length;
+      } else if (mode === 2) {                   // fix first at $8000
+        if (a < 0xC000) off = (a - 0x8000);
+        else off = (this.prgBank * 0x4000 + (a - 0xC000)) % this.cart.prg.length;
+      } else {                                   // fix last at $C000
+        if (a < 0xC000) off = (this.prgBank * 0x4000 + (a - 0x8000)) % this.cart.prg.length;
+        else off = ((nb - 1) * 0x4000 + (a - 0xC000)) % this.cart.prg.length;
+      }
+      return this.cart.prg[off];
+    }
+    return super.cpuRead(a);
+  }
+  cpuWrite(a, v) {
+    if (a < 0x8000) { super.cpuWrite(a, v); return; }
+    if (v & 0x80) { this.shift = 0x10; this.control |= 0x0C; return; }
+    const complete = this.shift & 1;
+    this.shift = (this.shift >> 1) | ((v & 1) << 4);
+    if (complete) {
+      const val = this.shift & 0x1F;
+      this.shift = 0x10;
+      if (a < 0xA000)      { this.control = val; this.updateMirroring(); }
+      else if (a < 0xC000) { this.chrBank0 = val; }
+      else if (a < 0xE000) { this.chrBank1 = val; }
+      else                 { this.prgBank = val & 0x0F; }
+    }
+  }
+  chrOffset(a) {
+    const len = this.cart.chr.length;
+    if (this.control & 0x10) {                   // two 4 KB banks
+      return a < 0x1000
+        ? (this.chrBank0 * 0x1000 + a) % len
+        : (this.chrBank1 * 0x1000 + (a - 0x1000)) % len;
+    }
+    return ((this.chrBank0 & 0x1E) * 0x1000 + a) % len;
+  }
+  ppuRead(a) { return this.cart.chr[this.chrOffset(a & 0x1FFF)]; }
+  ppuWrite(a, v) { if (this.cart.usesChrRam) this.cart.chr[this.chrOffset(a & 0x1FFF)] = v; }
+}
+
+// 4 — MMC3
+class MMC3 extends Mapper {
+  constructor(c) {
+    super(c);
+    this.bankSelect = 0;
+    this.regs = new Uint8Array(8);
+    this.prgMode = 0; this.chrMode = 0;
+    this.irqLatch = 0; this.irqCounter = 0; this.irqEnabled = false; this.irqReload = false;
+    this.prgBankCount = c.prg.length / 0x2000;   // in 8 KB units
+  }
+  cpuRead(a) {
+    if (a >= 0x8000) {
+      const slot = (a - 0x8000) >> 13;           // 0..3, 8 KB each
+      let bank;
+      const last = this.prgBankCount - 1, penult = this.prgBankCount - 2;
+      if (this.prgMode === 0) {
+        bank = [this.regs[6], this.regs[7], penult, last][slot];
+      } else {
+        bank = [penult, this.regs[7], this.regs[6], last][slot];
+      }
+      return this.cart.prg[((bank % this.prgBankCount) * 0x2000 + (a & 0x1FFF))];
+    }
+    return super.cpuRead(a);
+  }
+  cpuWrite(a, v) {
+    if (a < 0x8000) { super.cpuWrite(a, v); return; }
+    const even = (a & 1) === 0;
+    if (a < 0xA000) {
+      if (even) { this.bankSelect = v & 0x07; this.prgMode = (v >> 6) & 1; this.chrMode = (v >> 7) & 1; }
+      else { this.regs[this.bankSelect] = v; }
+    } else if (a < 0xC000) {
+      if (even) { if (this.mirroring !== MIRROR_FOUR) this.mirroring = (v & 1) ? MIRROR_HORIZONTAL : MIRROR_VERTICAL; }
+    } else if (a < 0xE000) {
+      if (even) this.irqLatch = v; else { this.irqCounter = 0; this.irqReload = true; }
+    } else {
+      if (even) { this.irqEnabled = false; this.irq = false; } else { this.irqEnabled = true; }
+    }
+  }
+  chrOffset(a) {
+    let bank, off;
+    if (this.chrMode === 0) {
+      if (a < 0x0800)      { bank = this.regs[0] & 0xFE; off = a; }
+      else if (a < 0x1000) { bank = this.regs[1] & 0xFE; off = a - 0x0800; }
+      else if (a < 0x1400) { bank = this.regs[2]; off = a - 0x1000; }
+      else if (a < 0x1800) { bank = this.regs[3]; off = a - 0x1400; }
+      else if (a < 0x1C00) { bank = this.regs[4]; off = a - 0x1800; }
+      else                 { bank = this.regs[5]; off = a - 0x1C00; }
+    } else {
+      if (a < 0x0400)      { bank = this.regs[2]; off = a; }
+      else if (a < 0x0800) { bank = this.regs[3]; off = a - 0x0400; }
+      else if (a < 0x0C00) { bank = this.regs[4]; off = a - 0x0800; }
+      else if (a < 0x1000) { bank = this.regs[5]; off = a - 0x0C00; }
+      else if (a < 0x1800) { bank = this.regs[0] & 0xFE; off = a - 0x1000; }
+      else                 { bank = this.regs[1] & 0xFE; off = a - 0x1800; }
+    }
+    return (bank * 0x0400 + off) % this.cart.chr.length;
+  }
+  ppuRead(a) { return this.cart.chr[this.chrOffset(a & 0x1FFF)]; }
+  ppuWrite(a, v) { if (this.cart.usesChrRam) this.cart.chr[this.chrOffset(a & 0x1FFF)] = v; }
+  scanline() {
+    if (this.irqCounter === 0 || this.irqReload) {
+      this.irqCounter = this.irqLatch;
+      this.irqReload = false;
+    } else {
+      this.irqCounter--;
+      if (this.irqCounter === 0 && this.irqEnabled) this.irq = true;
+    }
+  }
+}
+
+function makeMapper(cart) {
+  switch (cart.mapperNum) {
+    case 0:  return new NROM(cart);
+    case 1:  return new MMC1(cart);
+    case 2:  return new UxROM(cart);
+    case 3:  return new CNROM(cart);
+    case 4:  return new MMC3(cart);
+    case 7:  return new AxROM(cart);
+    case 66: return new GxROM(cart);
+    default:
+      throw new Error("Mapper " + cart.mapperNum + " isn't supported yet. Supported: 0, 1, 2, 3, 4, 7, 66.");
+  }
+}
+
+const MAPPER_NAMES = { 0:"NROM", 1:"MMC1", 2:"UxROM", 3:"CNROM", 4:"MMC3", 7:"AxROM", 66:"GxROM" };
+// ---------------------------------------------------------------- 2C02 PPU
+const NES_PALETTE = new Uint32Array([
+  0x666666,0x002A88,0x1412A7,0x3B00A4,0x5C007E,0x6E0040,0x6C0600,0x561D00,
+  0x333500,0x0B4800,0x005200,0x004F08,0x00404D,0x000000,0x000000,0x000000,
+  0xADADAD,0x155FD9,0x4240FF,0x7527FE,0xA01ACC,0xB71E7B,0xB53120,0x994E00,
+  0x6B6D00,0x388700,0x0C9300,0x008F32,0x007C8D,0x000000,0x000000,0x000000,
+  0xFFFEFF,0x64B0FF,0x9290FF,0xC676FF,0xF36AFF,0xFE6ECC,0xFE8170,0xEA9E22,
+  0xBCBE00,0x88D800,0x5CE430,0x45E082,0x48CDDE,0x4F4F4F,0x000000,0x000000,
+  0xFFFEFF,0xC0DFFF,0xD3D2FF,0xE8C8FF,0xFBC2FF,0xFEC4EA,0xFECCC5,0xF7D8A5,
+  0xE4E594,0xCFEF96,0xBDF4AB,0xB3F3CC,0xB5EBF2,0xB8B8B8,0x000000,0x000000,
+]);
+
+class PPU {
+  constructor(nes) {
+    this.nes = nes;
+    this.nametables = new Uint8Array(4096);   // 2 KB internal (+2 KB for four-screen)
+    this.palette = new Uint8Array(32);
+    this.oam = new Uint8Array(256);
+
+    this.frameBuffer = new Uint32Array(256 * 240);
+    this.frameComplete = false;
+    this.frameCount = 0;
+
+    this.scanline = 0;
+    this.dot = 0;
+    this.oddFrame = false;
+
+    // registers
+    this.ctrl = 0; this.mask = 0; this.status = 0;
+    this.oamAddr = 0;
+    this.v = 0; this.t = 0; this.fineX = 0; this.w = 0;
+    this.readBuffer = 0;
+    this.openBus = 0;
+
+    // background fetch latches / shifters
+    this.ntLatch = 0; this.atLatch = 0; this.lowLatch = 0; this.highLatch = 0;
+    this.bgLoShift = 0; this.bgHiShift = 0;
+    this.atLoShift = 0; this.atHiShift = 0;
+
+    // sprites for the current scanline
+    this.spriteCount = 0;
+    this.spriteX = new Int16Array(8);
+    this.spriteLo = new Uint8Array(8);
+    this.spriteHi = new Uint8Array(8);
+    this.spriteAttr = new Uint8Array(8);
+    this.spriteIsZero = new Uint8Array(8);
+
+    this.palette[0] = 0x0F;
+  }
+
+  get renderingEnabled() { return (this.mask & 0x18) !== 0; }
+  get bgEnabled() { return (this.mask & 0x08) !== 0; }
+  get sprEnabled() { return (this.mask & 0x10) !== 0; }
+
+  // ---- nametable mirroring
+  mirrorAddr(a) {
+    a &= 0x0FFF;
+    const table = a >> 10, off = a & 0x03FF;
+    switch (this.nes.mapper.mirroring) {
+      case MIRROR_HORIZONTAL: return ((table >> 1) * 0x400) + off;
+      case MIRROR_VERTICAL:   return ((table & 1) * 0x400) + off;
+      case MIRROR_SINGLE0:    return off;
+      case MIRROR_SINGLE1:    return 0x400 + off;
+      default:                return a;   // four-screen
+    }
+  }
+
+  ppuRead(a) {
+    a &= 0x3FFF;
+    if (a < 0x2000) return this.nes.mapper.ppuRead(a);
+    if (a < 0x3F00) return this.nametables[this.mirrorAddr(a)];
+    let p = a & 0x1F;
+    if ((p & 0x13) === 0x10) p &= 0x0F;
+    return this.palette[p] & 0x3F;
+  }
+  ppuWrite(a, val) {
+    a &= 0x3FFF;
+    if (a < 0x2000) { this.nes.mapper.ppuWrite(a, val); return; }
+    if (a < 0x3F00) { this.nametables[this.mirrorAddr(a)] = val; return; }
+    let p = a & 0x1F;
+    if ((p & 0x13) === 0x10) p &= 0x0F;
+    this.palette[p] = val & 0x3F;
+  }
+
+  // ---- CPU-facing registers $2000-$2007
+  readRegister(reg) {
+    switch (reg) {
+      case 2: {                                  // PPUSTATUS
+        const r = (this.status & 0xE0) | (this.openBus & 0x1F);
+        this.status &= ~0x80;                    // clear vblank
+        this.w = 0;
+        this.openBus = r;
+        return r;
+      }
+      case 4: {                                  // OAMDATA
+        let v = this.oam[this.oamAddr];
+        if ((this.oamAddr & 3) === 2) v &= 0xE3;
+        this.openBus = v;
+        return v;
+      }
+      case 7: {                                  // PPUDATA
+        let v;
+        const a = this.v & 0x3FFF;
+        if (a >= 0x3F00) { v = this.ppuRead(a); this.readBuffer = this.ppuRead(a & 0x2FFF); }
+        else { v = this.readBuffer; this.readBuffer = this.ppuRead(a); }
+        this.v = (this.v + ((this.ctrl & 0x04) ? 32 : 1)) & 0x7FFF;
+        this.openBus = v;
+        return v;
+      }
+      default: return this.openBus;
+    }
+  }
+
+  writeRegister(reg, val) {
+    this.openBus = val;
+    switch (reg) {
+      case 0:                                    // PPUCTRL
+        this.ctrl = val;
+        this.t = (this.t & 0x73FF) | ((val & 0x03) << 10);
+        break;
+      case 1: this.mask = val; break;
+      case 3: this.oamAddr = val; break;
+      case 4: this.oam[this.oamAddr] = val; this.oamAddr = (this.oamAddr + 1) & 0xFF; break;
+      case 5:                                    // PPUSCROLL
+        if (this.w === 0) { this.fineX = val & 0x07; this.t = (this.t & 0x7FE0) | (val >> 3); this.w = 1; }
+        else {
+          this.t = (this.t & 0x0C1F) | ((val & 0x07) << 12) | ((val & 0xF8) << 2);
+          this.w = 0;
+        }
+        break;
+      case 6:                                    // PPUADDR
+        if (this.w === 0) { this.t = (this.t & 0x00FF) | ((val & 0x3F) << 8); this.w = 1; }
+        else { this.t = (this.t & 0x7F00) | val; this.v = this.t; this.w = 0; }
+        break;
+      case 7:
+        this.ppuWrite(this.v & 0x3FFF, val);
+        this.v = (this.v + ((this.ctrl & 0x04) ? 32 : 1)) & 0x7FFF;
+        break;
+    }
+  }
+
+  // ---- loopy scroll helpers
+  incX() {
+    if ((this.v & 0x001F) === 31) { this.v &= ~0x001F; this.v ^= 0x0400; }
+    else this.v++;
+  }
+  incY() {
+    if ((this.v & 0x7000) !== 0x7000) { this.v += 0x1000; return; }
+    this.v &= ~0x7000;
+    let y = (this.v & 0x03E0) >> 5;
+    if (y === 29) { y = 0; this.v ^= 0x0800; }
+    else if (y === 31) { y = 0; }
+    else y++;
+    this.v = (this.v & ~0x03E0) | (y << 5);
+  }
+  copyX() { this.v = (this.v & 0x7BE0) | (this.t & 0x041F); }
+  copyY() { this.v = (this.v & 0x041F) | (this.t & 0x7BE0); }
+
+  loadShifters() {
+    this.bgLoShift = (this.bgLoShift & 0xFF00) | this.lowLatch;
+    this.bgHiShift = (this.bgHiShift & 0xFF00) | this.highLatch;
+    this.atLoShift = (this.atLoShift & 0xFF00) | ((this.atLatch & 1) ? 0xFF : 0x00);
+    this.atHiShift = (this.atHiShift & 0xFF00) | ((this.atLatch & 2) ? 0xFF : 0x00);
+  }
+  shift() {
+    if (!this.bgEnabled) return;
+    this.bgLoShift = (this.bgLoShift << 1) & 0xFFFF;
+    this.bgHiShift = (this.bgHiShift << 1) & 0xFFFF;
+    this.atLoShift = (this.atLoShift << 1) & 0xFFFF;
+    this.atHiShift = (this.atHiShift << 1) & 0xFFFF;
+  }
+
+  fetchBackground() {
+    switch (this.dot & 0x07) {
+      case 1: this.loadShifters();
+              this.ntLatch = this.ppuRead(0x2000 | (this.v & 0x0FFF)); break;
+      case 3: {
+        const a = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
+        let at = this.ppuRead(a);
+        if (this.v & 0x0040) at >>= 4;
+        if (this.v & 0x0002) at >>= 2;
+        this.atLatch = at & 0x03;
+        break;
+      }
+      case 5: {
+        const base = (this.ctrl & 0x10) ? 0x1000 : 0x0000;
+        this.lowLatch = this.ppuRead(base + this.ntLatch * 16 + ((this.v >> 12) & 7));
+        break;
+      }
+      case 7: {
+        const base = (this.ctrl & 0x10) ? 0x1000 : 0x0000;
+        this.highLatch = this.ppuRead(base + this.ntLatch * 16 + ((this.v >> 12) & 7) + 8);
+        break;
+      }
+      case 0: this.incX(); break;
+    }
+  }
+
+  evaluateSprites(forScanline) {
+    this.spriteCount = 0;
+    const tall = (this.ctrl & 0x20) !== 0;
+    const height = tall ? 16 : 8;
+    for (let i = 0; i < 64; i++) {
+      const y = this.oam[i * 4];
+      const row = forScanline - y;
+      if (row < 0 || row >= height) continue;
+      if (this.spriteCount === 8) { this.status |= 0x20; break; }
+      const tile = this.oam[i * 4 + 1];
+      const attr = this.oam[i * 4 + 2];
+      const x = this.oam[i * 4 + 3];
+      let r = (attr & 0x80) ? (height - 1 - row) : row;
+      let addr;
+      if (tall) {
+        const bank = (tile & 1) * 0x1000;
+        addr = bank + ((tile & 0xFE) + (r >= 8 ? 1 : 0)) * 16 + (r & 7);
+      } else {
+        addr = ((this.ctrl & 0x08) ? 0x1000 : 0x0000) + tile * 16 + r;
+      }
+      let lo = this.ppuRead(addr), hi = this.ppuRead(addr + 8);
+      if (attr & 0x40) { lo = reverseByte(lo); hi = reverseByte(hi); }
+      const s = this.spriteCount++;
+      this.spriteX[s] = x;
+      this.spriteLo[s] = lo;
+      this.spriteHi[s] = hi;
+      this.spriteAttr[s] = attr;
+      this.spriteIsZero[s] = i === 0 ? 1 : 0;
+    }
+  }
+
+  renderPixel() {
+    const x = this.dot - 1, y = this.scanline;
+
+    let bgPixel = 0, bgPal = 0;
+    if (this.bgEnabled && !(x < 8 && !(this.mask & 0x02))) {
+      const m = 0x8000 >> this.fineX;
+      bgPixel = ((this.bgLoShift & m) ? 1 : 0) | ((this.bgHiShift & m) ? 2 : 0);
+      bgPal   = ((this.atLoShift & m) ? 1 : 0) | ((this.atHiShift & m) ? 2 : 0);
+    }
+
+    let sprPixel = 0, sprPal = 0, sprPriority = 0, sprZero = false;
+    if (this.sprEnabled && !(x < 8 && !(this.mask & 0x04))) {
+      for (let i = 0; i < this.spriteCount; i++) {
+        const dx = x - this.spriteX[i];
+        if (dx < 0 || dx > 7) continue;
+        const m = 0x80 >> dx;
+        const p = ((this.spriteLo[i] & m) ? 1 : 0) | ((this.spriteHi[i] & m) ? 2 : 0);
+        if (p === 0) continue;
+        sprPixel = p;
+        sprPal = (this.spriteAttr[i] & 0x03) + 4;
+        sprPriority = (this.spriteAttr[i] & 0x20) === 0 ? 1 : 0;
+        sprZero = this.spriteIsZero[i] === 1;
+        break;
+      }
+    }
+
+    let pixel = 0, pal = 0;
+    if (bgPixel === 0 && sprPixel > 0) { pixel = sprPixel; pal = sprPal; }
+    else if (bgPixel > 0 && sprPixel === 0) { pixel = bgPixel; pal = bgPal; }
+    else if (bgPixel > 0 && sprPixel > 0) {
+      if (sprPriority) { pixel = sprPixel; pal = sprPal; }
+      else { pixel = bgPixel; pal = bgPal; }
+      if (sprZero && this.bgEnabled && x !== 255) this.status |= 0x40;
+    }
+
+    let idx = this.palette[pixel === 0 ? 0 : (pal * 4 + pixel)] & 0x3F;
+    if (this.mask & 0x01) idx &= 0x30;          // greyscale
+    let rgb = NES_PALETTE[idx];
+    // colour emphasis
+    const emph = (this.mask >> 5) & 0x07;
+    if (emph) rgb = applyEmphasis(rgb, emph);
+    this.frameBuffer[y * 256 + x] = 0xFF000000 | ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF);
+  }
+
+  // one PPU dot
+  step() {
+    const visible = this.scanline < 240;
+    const prerender = this.scanline === 261;
+
+    if (visible || prerender) {
+      if (prerender && this.dot === 1) this.status &= ~(0x80 | 0x40 | 0x20);
+
+      if (this.renderingEnabled) {
+        if ((this.dot >= 2 && this.dot < 258) || (this.dot >= 321 && this.dot < 338)) this.shift();
+        if ((this.dot >= 1 && this.dot <= 256) || (this.dot >= 321 && this.dot <= 336)) this.fetchBackground();
+        if (this.dot === 256) this.incY();
+        if (this.dot === 257) { this.loadShifters(); this.copyX(); }
+        if (this.dot === 338 || this.dot === 340) this.ppuRead(0x2000 | (this.v & 0x0FFF));
+        if (prerender && this.dot >= 280 && this.dot <= 304) this.copyY();
+        if (this.dot === 260) this.nes.mapper.scanline();
+        if (this.dot === 257) this.evaluateSprites(visible ? this.scanline + 1 : 0);
+        if (this.dot >= 257 && this.dot <= 320) this.oamAddr = 0;
+      }
+
+      if (visible && this.dot >= 1 && this.dot <= 256) this.renderPixel();
+    }
+
+    if (this.scanline === 241 && this.dot === 1) {
+      this.status |= 0x80;
+      if (this.ctrl & 0x80) this.nes.cpu.triggerNMI();
+      this.frameComplete = true;
+      this.frameCount++;
+    }
+
+    this.dot++;
+    if (prerender && this.dot === 340 && this.oddFrame && this.renderingEnabled) this.dot++;
+    if (this.dot > 340) {
+      this.dot = 0;
+      this.scanline++;
+      if (this.scanline > 261) { this.scanline = 0; this.oddFrame = !this.oddFrame; }
+    }
+  }
+}
+
+function reverseByte(b) {
+  b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4);
+  b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2);
+  b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1);
+  return b;
+}
+
+function applyEmphasis(rgb, emph) {
+  let r = (rgb >> 16) & 0xFF, g = (rgb >> 8) & 0xFF, b = rgb & 0xFF;
+  const dim = 0.75;
+  if (!(emph & 1)) { g *= dim; b *= dim; }     // emphasize red -> dim others
+  if (!(emph & 2)) { r *= dim; b *= dim; }
+  if (!(emph & 4)) { r *= dim; g *= dim; }
+  return ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
+}
+// ---------------------------------------------------------------- 2A03 APU
+const LENGTH_TABLE = [10,254,20,2,40,4,80,6,160,8,60,10,14,12,26,14,
+                      12,16,24,18,48,20,96,22,192,24,72,26,16,28,32,30];
+const DUTY_TABLE = [
+  [0,1,0,0,0,0,0,0],
+  [0,1,1,0,0,0,0,0],
+  [0,1,1,1,1,0,0,0],
+  [1,0,0,1,1,1,1,1],
+];
+const TRIANGLE_TABLE = [15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0,
+                        0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+const NOISE_PERIODS = [4,8,16,32,64,96,128,160,202,254,380,508,762,1016,2034,4068];
+const DMC_PERIODS = [428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54];
+
+class Pulse {
+  constructor(channel) {
+    this.channel = channel;
+    this.enabled = false;
+    this.duty = 0; this.dutyPos = 0;
+    this.lengthHalt = false; this.lengthValue = 0;
+    this.constantVolume = false; this.volume = 0;
+    this.envelopeStart = false; this.envelopeValue = 0; this.envelopeVolume = 0;
+    this.sweepEnabled = false; this.sweepPeriod = 0; this.sweepNegate = false;
+    this.sweepShift = 0; this.sweepReload = false; this.sweepValue = 0;
+    this.timerPeriod = 0; this.timerValue = 0;
+  }
+  writeControl(v) {
+    this.duty = (v >> 6) & 3;
+    this.lengthHalt = (v & 0x20) !== 0;
+    this.constantVolume = (v & 0x10) !== 0;
+    this.volume = v & 0x0F;
+    this.envelopeStart = true;
+  }
+  writeSweep(v) {
+    this.sweepEnabled = (v & 0x80) !== 0;
+    this.sweepPeriod = ((v >> 4) & 7) + 1;
+    this.sweepNegate = (v & 0x08) !== 0;
+    this.sweepShift = v & 7;
+    this.sweepReload = true;
+  }
+  writeTimerLow(v) { this.timerPeriod = (this.timerPeriod & 0x700) | v; }
+  writeTimerHigh(v) {
+    this.timerPeriod = (this.timerPeriod & 0xFF) | ((v & 7) << 8);
+    if (this.enabled) this.lengthValue = LENGTH_TABLE[(v >> 3) & 0x1F];
+    this.envelopeStart = true;
+    this.dutyPos = 0;
+  }
+  stepTimer() {
+    if (this.timerValue === 0) {
+      this.timerValue = this.timerPeriod;
+      this.dutyPos = (this.dutyPos + 1) & 7;
+    } else this.timerValue--;
+  }
+  stepEnvelope() {
+    if (this.envelopeStart) { this.envelopeVolume = 15; this.envelopeValue = this.volume; this.envelopeStart = false; }
+    else if (this.envelopeValue > 0) this.envelopeValue--;
+    else {
+      this.envelopeValue = this.volume;
+      if (this.envelopeVolume > 0) this.envelopeVolume--;
+      else if (this.lengthHalt) this.envelopeVolume = 15;
+    }
+  }
+  targetPeriod() {
+    const delta = this.timerPeriod >> this.sweepShift;
+    if (this.sweepNegate) return this.timerPeriod - delta - (this.channel === 1 ? 1 : 0);
+    return this.timerPeriod + delta;
+  }
+  stepSweep() {
+    if (this.sweepReload) {
+      if (this.sweepEnabled && this.sweepValue === 0) this.applySweep();
+      this.sweepValue = this.sweepPeriod; this.sweepReload = false;
+    } else if (this.sweepValue > 0) this.sweepValue--;
+    else { if (this.sweepEnabled) this.applySweep(); this.sweepValue = this.sweepPeriod; }
+  }
+  applySweep() {
+    const t = this.targetPeriod();
+    if (t >= 8 && t <= 0x7FF && this.sweepShift > 0) this.timerPeriod = t;
+  }
+  stepLength() { if (!this.lengthHalt && this.lengthValue > 0) this.lengthValue--; }
+  output() {
+    if (!this.enabled || this.lengthValue === 0) return 0;
+    if (this.timerPeriod < 8 || this.targetPeriod() > 0x7FF) return 0;
+    if (DUTY_TABLE[this.duty][this.dutyPos] === 0) return 0;
+    return this.constantVolume ? this.volume : this.envelopeVolume;
+  }
+}
+
+class Triangle {
+  constructor() {
+    this.enabled = false; this.lengthHalt = false; this.lengthValue = 0;
+    this.timerPeriod = 0; this.timerValue = 0; this.dutyPos = 0;
+    this.counterPeriod = 0; this.counterValue = 0; this.counterReload = false;
+  }
+  writeControl(v) { this.lengthHalt = (v & 0x80) !== 0; this.counterPeriod = v & 0x7F; }
+  writeTimerLow(v) { this.timerPeriod = (this.timerPeriod & 0x700) | v; }
+  writeTimerHigh(v) {
+    this.timerPeriod = (this.timerPeriod & 0xFF) | ((v & 7) << 8);
+    if (this.enabled) this.lengthValue = LENGTH_TABLE[(v >> 3) & 0x1F];
+    this.timerValue = this.timerPeriod;
+    this.counterReload = true;
+  }
+  stepTimer() {
+    if (this.timerValue === 0) {
+      this.timerValue = this.timerPeriod;
+      if (this.lengthValue > 0 && this.counterValue > 0) this.dutyPos = (this.dutyPos + 1) & 31;
+    } else this.timerValue--;
+  }
+  stepCounter() {
+    if (this.counterReload) this.counterValue = this.counterPeriod;
+    else if (this.counterValue > 0) this.counterValue--;
+    if (!this.lengthHalt) this.counterReload = false;
+  }
+  stepLength() { if (!this.lengthHalt && this.lengthValue > 0) this.lengthValue--; }
+  output() {
+    if (!this.enabled || this.lengthValue === 0 || this.counterValue === 0) return 0;
+    if (this.timerPeriod < 2) return 7;
+    return TRIANGLE_TABLE[this.dutyPos];
+  }
+}
+
+class Noise {
+  constructor() {
+    this.enabled = false; this.mode = false; this.shiftReg = 1;
+    this.lengthHalt = false; this.lengthValue = 0;
+    this.constantVolume = false; this.volume = 0;
+    this.envelopeStart = false; this.envelopeValue = 0; this.envelopeVolume = 0;
+    this.timerPeriod = 0; this.timerValue = 0;
+  }
+  writeControl(v) {
+    this.lengthHalt = (v & 0x20) !== 0;
+    this.constantVolume = (v & 0x10) !== 0;
+    this.volume = v & 0x0F;
+    this.envelopeStart = true;
+  }
+  writePeriod(v) { this.mode = (v & 0x80) !== 0; this.timerPeriod = NOISE_PERIODS[v & 0x0F]; }
+  writeLength(v) { if (this.enabled) this.lengthValue = LENGTH_TABLE[(v >> 3) & 0x1F]; this.envelopeStart = true; }
+  stepTimer() {
+    if (this.timerValue === 0) {
+      this.timerValue = this.timerPeriod;
+      const bit = this.mode ? 6 : 1;
+      const fb = (this.shiftReg & 1) ^ ((this.shiftReg >> bit) & 1);
+      this.shiftReg = (this.shiftReg >> 1) | (fb << 14);
+    } else this.timerValue--;
+  }
+  stepEnvelope() {
+    if (this.envelopeStart) { this.envelopeVolume = 15; this.envelopeValue = this.volume; this.envelopeStart = false; }
+    else if (this.envelopeValue > 0) this.envelopeValue--;
+    else {
+      this.envelopeValue = this.volume;
+      if (this.envelopeVolume > 0) this.envelopeVolume--;
+      else if (this.lengthHalt) this.envelopeVolume = 15;
+    }
+  }
+  stepLength() { if (!this.lengthHalt && this.lengthValue > 0) this.lengthValue--; }
+  output() {
+    if (!this.enabled || this.lengthValue === 0 || (this.shiftReg & 1) === 1) return 0;
+    return this.constantVolume ? this.volume : this.envelopeVolume;
+  }
+}
+
+class DMC {
+  constructor(nes) {
+    this.nes = nes;
+    this.enabled = false; this.value = 0;
+    this.sampleAddr = 0; this.sampleLen = 0;
+    this.currentAddr = 0; this.currentLen = 0;
+    this.shiftReg = 0; this.bitCount = 0;
+    this.tickPeriod = 0; this.tickValue = 0;
+    this.loop = false; this.irqEnable = false; this.irq = false;
+  }
+  writeControl(v) {
+    this.irqEnable = (v & 0x80) !== 0;
+    this.loop = (v & 0x40) !== 0;
+    this.tickPeriod = DMC_PERIODS[v & 0x0F];
+    if (!this.irqEnable) this.irq = false;
+  }
+  writeValue(v) { this.value = v & 0x7F; }
+  writeAddress(v) { this.sampleAddr = 0xC000 | (v << 6); }
+  writeLength(v) { this.sampleLen = (v << 4) | 1; }
+  restart() { this.currentAddr = this.sampleAddr; this.currentLen = this.sampleLen; }
+  stepTimer() {
+    if (!this.enabled) return;
+    this.stepReader();
+    if (this.tickValue === 0) { this.tickValue = this.tickPeriod; this.stepShifter(); }
+    else this.tickValue--;
+  }
+  stepReader() {
+    if (this.currentLen > 0 && this.bitCount === 0) {
+      this.nes.cpu.stall += 4;
+      this.shiftReg = this.nes.cpuRead(this.currentAddr);
+      this.bitCount = 8;
+      this.currentAddr = this.currentAddr === 0xFFFF ? 0x8000 : this.currentAddr + 1;
+      this.currentLen--;
+      if (this.currentLen === 0) {
+        if (this.loop) this.restart();
+        else if (this.irqEnable) this.irq = true;
+      }
+    }
+  }
+  stepShifter() {
+    if (this.bitCount === 0) return;
+    if (this.shiftReg & 1) { if (this.value <= 125) this.value += 2; }
+    else { if (this.value >= 2) this.value -= 2; }
+    this.shiftReg >>= 1;
+    this.bitCount--;
+  }
+  output() { return this.enabled ? this.value : 0; }
+}
+
+class APU {
+  constructor(nes) {
+    this.nes = nes;
+    this.pulse1 = new Pulse(1);
+    this.pulse2 = new Pulse(2);
+    this.triangle = new Triangle();
+    this.noise = new Noise();
+    this.dmc = new DMC(nes);
+    this.cycle = 0;
+    this.frameStep = 0;
+    this.frameMode5 = false;
+    this.irqInhibit = false;
+    this.frameIrq = false;
+
+    // resampling
+    this.sampleRate = 44100;
+    this.cpuRate = 1789773;
+    this.cyclesPerSample = this.cpuRate / this.sampleRate;
+    this.sampleCounter = 0;
+    this.buffer = new Float32Array(8192);
+    this.writeIdx = 0; this.readIdx = 0;
+    this.lastOut = 0; this.hp = 0;
+
+    // lookup tables for the nonlinear mixer
+    this.pulseTable = new Float32Array(31);
+    for (let i = 0; i < 31; i++) this.pulseTable[i] = 95.52 / (8128.0 / i + 100);
+    this.tndTable = new Float32Array(203);
+    for (let i = 0; i < 203; i++) this.tndTable[i] = 163.67 / (24329.0 / i + 100);
+  }
+
+  writeRegister(addr, v) {
+    switch (addr) {
+      case 0x4000: this.pulse1.writeControl(v); break;
+      case 0x4001: this.pulse1.writeSweep(v); break;
+      case 0x4002: this.pulse1.writeTimerLow(v); break;
+      case 0x4003: this.pulse1.writeTimerHigh(v); break;
+      case 0x4004: this.pulse2.writeControl(v); break;
+      case 0x4005: this.pulse2.writeSweep(v); break;
+      case 0x4006: this.pulse2.writeTimerLow(v); break;
+      case 0x4007: this.pulse2.writeTimerHigh(v); break;
+      case 0x4008: this.triangle.writeControl(v); break;
+      case 0x400A: this.triangle.writeTimerLow(v); break;
+      case 0x400B: this.triangle.writeTimerHigh(v); break;
+      case 0x400C: this.noise.writeControl(v); break;
+      case 0x400E: this.noise.writePeriod(v); break;
+      case 0x400F: this.noise.writeLength(v); break;
+      case 0x4010: this.dmc.writeControl(v); break;
+      case 0x4011: this.dmc.writeValue(v); break;
+      case 0x4012: this.dmc.writeAddress(v); break;
+      case 0x4013: this.dmc.writeLength(v); break;
+      case 0x4015:
+        this.pulse1.enabled = (v & 1) !== 0; if (!this.pulse1.enabled) this.pulse1.lengthValue = 0;
+        this.pulse2.enabled = (v & 2) !== 0; if (!this.pulse2.enabled) this.pulse2.lengthValue = 0;
+        this.triangle.enabled = (v & 4) !== 0; if (!this.triangle.enabled) this.triangle.lengthValue = 0;
+        this.noise.enabled = (v & 8) !== 0; if (!this.noise.enabled) this.noise.lengthValue = 0;
+        this.dmc.enabled = (v & 16) !== 0;
+        if (!this.dmc.enabled) this.dmc.currentLen = 0;
+        else if (this.dmc.currentLen === 0) this.dmc.restart();
+        this.dmc.irq = false;
+        break;
+      case 0x4017:
+        this.frameMode5 = (v & 0x80) !== 0;
+        this.irqInhibit = (v & 0x40) !== 0;
+        if (this.irqInhibit) this.frameIrq = false;
+        this.frameStep = 0;
+        this.cycle = 0;
+        if (this.frameMode5) { this.stepEnvelopes(); this.stepLengthsAndSweeps(); }
+        break;
+    }
+  }
+
+  readStatus() {
+    let r = 0;
+    if (this.pulse1.lengthValue > 0) r |= 1;
+    if (this.pulse2.lengthValue > 0) r |= 2;
+    if (this.triangle.lengthValue > 0) r |= 4;
+    if (this.noise.lengthValue > 0) r |= 8;
+    if (this.dmc.currentLen > 0) r |= 16;
+    if (this.frameIrq) r |= 0x40;
+    if (this.dmc.irq) r |= 0x80;
+    this.frameIrq = false;
+    return r;
+  }
+
+  stepEnvelopes() {
+    this.pulse1.stepEnvelope(); this.pulse2.stepEnvelope();
+    this.noise.stepEnvelope(); this.triangle.stepCounter();
+  }
+  stepLengthsAndSweeps() {
+    this.pulse1.stepLength(); this.pulse2.stepLength();
+    this.triangle.stepLength(); this.noise.stepLength();
+    this.pulse1.stepSweep(); this.pulse2.stepSweep();
+  }
+
+  // called once per CPU cycle
+  step() {
+    this.cycle++;
+
+    // APU timers run at half CPU rate (except triangle & DMC)
+    if ((this.cycle & 1) === 0) {
+      this.pulse1.stepTimer(); this.pulse2.stepTimer(); this.noise.stepTimer();
+    }
+    this.triangle.stepTimer();
+    this.dmc.stepTimer();
+
+    // frame sequencer, ~240 Hz
+    const seq = this.frameMode5
+      ? [7457, 14913, 22371, 29829, 37281]
+      : [7457, 14913, 22371, 29829];
+    if (this.cycle === seq[this.frameStep]) {
+      if (this.frameMode5) {
+        if (this.frameStep === 0 || this.frameStep === 2) this.stepEnvelopes();
+        else if (this.frameStep === 1 || this.frameStep === 4) { this.stepEnvelopes(); this.stepLengthsAndSweeps(); }
+      } else {
+        this.stepEnvelopes();
+        if (this.frameStep === 1 || this.frameStep === 3) this.stepLengthsAndSweeps();
+        if (this.frameStep === 3 && !this.irqInhibit) this.frameIrq = true;
+      }
+      this.frameStep++;
+      if (this.frameStep >= seq.length) { this.frameStep = 0; this.cycle = 0; }
+    }
+
+    this.sampleCounter++;
+    if (this.sampleCounter >= this.cyclesPerSample) {
+      this.sampleCounter -= this.cyclesPerSample;
+      this.pushSample(this.mix());
+    }
+  }
+
+  mix() {
+    const p = this.pulseTable[this.pulse1.output() + this.pulse2.output()];
+    const t = this.tndTable[3 * this.triangle.output() + 2 * this.noise.output() + this.dmc.output()];
+    let out = p + t;
+    // high-pass to remove DC offset
+    this.hp += (out - this.hp) * 0.0008;
+    return (out - this.hp) * 1.2;
+  }
+
+  pushSample(s) {
+    const next = (this.writeIdx + 1) % this.buffer.length;
+    if (next === this.readIdx) return;             // buffer full, drop
+    this.buffer[this.writeIdx] = s;
+    this.writeIdx = next;
+  }
+
+  available() {
+    return (this.writeIdx - this.readIdx + this.buffer.length) % this.buffer.length;
+  }
+
+  fill(out) {
+    for (let i = 0; i < out.length; i++) {
+      if (this.readIdx !== this.writeIdx) {
+        this.lastOut = this.buffer[this.readIdx];
+        this.readIdx = (this.readIdx + 1) % this.buffer.length;
+      }
+      out[i] = this.lastOut;
+    }
+  }
+
+  get irqAsserted() { return this.frameIrq || this.dmc.irq; }
+}
+// ---------------------------------------------------------------- system bus
+class NES {
+  constructor(romBytes) {
+    this.cart = new Cartridge(romBytes);
+    this.mapper = makeMapper(this.cart);
+    this.ram = new Uint8Array(2048);
+    this.cpu = new CPU(this);
+    this.ppu = new PPU(this);
+    this.apu = new APU(this);
+
+    this.controllers = [0, 0];
+    this.shiftRegs = [0, 0];
+    this.strobe = false;
+
+    this.cpu.reset();
+  }
+
+  cpuRead(a) {
+    a &= 0xFFFF;
+    if (a < 0x2000) return this.ram[a & 0x07FF];
+    if (a < 0x4000) return this.ppu.readRegister(a & 0x0007);
+    if (a === 0x4015) return this.apu.readStatus();
+    if (a === 0x4016 || a === 0x4017) {
+      const i = a & 1;
+      const v = this.shiftRegs[i] & 1;
+      this.shiftRegs[i] = (this.shiftRegs[i] >> 1) | 0x80;
+      return 0x40 | v;
+    }
+    if (a < 0x4020) return 0;
+    return this.mapper.cpuRead(a);
+  }
+
+  cpuWrite(a, v) {
+    a &= 0xFFFF; v &= 0xFF;
+    if (a < 0x2000) { this.ram[a & 0x07FF] = v; return; }
+    if (a < 0x4000) { this.ppu.writeRegister(a & 0x0007, v); return; }
+    if (a === 0x4014) {                       // OAM DMA
+      const base = v << 8;
+      for (let i = 0; i < 256; i++) {
+        this.ppu.oam[(this.ppu.oamAddr + i) & 0xFF] = this.cpuRead(base + i);
+      }
+      this.cpu.stall += (this.cpu.cycles & 1) ? 514 : 513;
+      return;
+    }
+    if (a === 0x4016) {
+      const strobe = (v & 1) !== 0;
+      if (this.strobe && !strobe) {
+        this.shiftRegs[0] = this.controllers[0];
+        this.shiftRegs[1] = this.controllers[1];
+      }
+      this.strobe = strobe;
+      if (strobe) {
+        this.shiftRegs[0] = this.controllers[0];
+        this.shiftRegs[1] = this.controllers[1];
+      }
+      return;
+    }
+    if (a >= 0x4000 && a <= 0x4017) { this.apu.writeRegister(a, v); return; }
+    if (a < 0x4020) return;
+    this.mapper.cpuWrite(a, v);
+  }
+
+  setButtons(player, mask) { this.controllers[player] = mask & 0xFF; }
+
+  // run one CPU instruction and the matching PPU/APU cycles
+  stepInstruction() {
+    const before = this.cpu.cycles;
+    this.cpu.step();
+    let elapsed = this.cpu.cycles - before;
+    if (elapsed <= 0) elapsed = 1;
+    for (let i = 0; i < elapsed; i++) {
+      this.apu.step();
+      this.ppu.step(); this.ppu.step(); this.ppu.step();
+    }
+    this.cpu.setIRQ(this.mapper.irq || this.apu.irqAsserted);
+    return elapsed;
+  }
+
+  runFrame() {
+    this.ppu.frameComplete = false;
+    let guard = 0;
+    while (!this.ppu.frameComplete && guard++ < 200000) this.stepInstruction();
+    return this.ppu.frameBuffer;
+  }
+
+  reset() {
+    this.cpu.reset();
+    this.ppu.scanline = 0; this.ppu.dot = 0;
+    this.ppu.status = 0; this.ppu.ctrl = 0; this.ppu.mask = 0;
+  }
+}
+// ---------------------------------------------------------------- key binding
+// One remapper drives all three systems. The NES core reads a bitmask directly;
+// the libretro cores are handed an EJS_defaultControls table built from the same
+// data, so a change here applies everywhere.
+
+const $ = (id) => document.getElementById(id);
+
+const NES_MASK = { A:0x01, B:0x02, SELECT:0x04, START:0x08, UP:0x10, DOWN:0x20, LEFT:0x40, RIGHT:0x80 };
+
+// RetroArch input indices, as used by EJS_defaultControls
+const RA = {
+  B:0, Y:1, SELECT:2, START:3, UP:4, DOWN:5, LEFT:6, RIGHT:7,
+  A:8, X:9, L:10, R:11, L2:12, R2:13, L3:14, R3:15,
+  LS_RIGHT:16, LS_LEFT:17, LS_DOWN:18, LS_UP:19,
+  RS_RIGHT:20, RS_LEFT:21, RS_DOWN:22, RS_UP:23,
+};
+const RA_GAMEPAD = {
+  0:"BUTTON_2", 1:"BUTTON_4", 2:"SELECT", 3:"START",
+  4:"DPAD_UP", 5:"DPAD_DOWN", 6:"DPAD_LEFT", 7:"DPAD_RIGHT",
+  8:"BUTTON_1", 9:"BUTTON_3", 10:"LEFT_TOP_SHOULDER", 11:"RIGHT_TOP_SHOULDER",
+  12:"LEFT_BOTTOM_SHOULDER", 13:"RIGHT_BOTTOM_SHOULDER", 14:"LEFT_STICK", 15:"RIGHT_STICK",
+  16:"LEFT_STICK_X:+1", 17:"LEFT_STICK_X:-1", 18:"LEFT_STICK_Y:+1", 19:"LEFT_STICK_Y:-1",
+  20:"RIGHT_STICK_X:+1", 21:"RIGHT_STICK_X:-1", 22:"RIGHT_STICK_Y:+1", 23:"RIGHT_STICK_Y:-1",
+};
+
+// Per-system button list: [id, label, retroarch index]
+const SYSTEM_BUTTONS = {
+  nes: [
+    ["UP","Up",RA.UP], ["DOWN","Down",RA.DOWN], ["LEFT","Left",RA.LEFT], ["RIGHT","Right",RA.RIGHT],
+    ["B","B",RA.B], ["A","A",RA.A], ["SELECT","Select",RA.SELECT], ["START","Start",RA.START],
+  ],
+  snes: [
+    ["UP","Up",RA.UP], ["DOWN","Down",RA.DOWN], ["LEFT","Left",RA.LEFT], ["RIGHT","Right",RA.RIGHT],
+    ["B","B",RA.B], ["A","A",RA.A], ["Y","Y",RA.Y], ["X","X",RA.X],
+    ["L","L",RA.L], ["R","R",RA.R],
+    ["SELECT","Select",RA.SELECT], ["START","Start",RA.START],
+  ],
+  n64: [
+    ["STICK_UP","Stick up",RA.LS_UP], ["STICK_DOWN","Stick down",RA.LS_DOWN],
+    ["STICK_LEFT","Stick left",RA.LS_LEFT], ["STICK_RIGHT","Stick right",RA.LS_RIGHT],
+    ["UP","D-pad up",RA.UP], ["DOWN","D-pad down",RA.DOWN],
+    ["LEFT","D-pad left",RA.LEFT], ["RIGHT","D-pad right",RA.RIGHT],
+    ["A","A",RA.B], ["B","B",RA.Y], ["Z","Z trigger",RA.L2],
+    ["L","L",RA.L], ["R","R",RA.R], ["START","Start",RA.START],
+    ["C_UP","C up",RA.RS_UP], ["C_DOWN","C down",RA.RS_DOWN],
+    ["C_LEFT","C left",RA.RS_LEFT], ["C_RIGHT","C right",RA.RS_RIGHT],
+  ],
+  psx: [
+    ["STICK_UP","L-stick up",RA.LS_UP], ["STICK_DOWN","L-stick down",RA.LS_DOWN],
+    ["STICK_LEFT","L-stick left",RA.LS_LEFT], ["STICK_RIGHT","L-stick right",RA.LS_RIGHT],
+    ["UP","D-pad up",RA.UP], ["DOWN","D-pad down",RA.DOWN],
+    ["LEFT","D-pad left",RA.LEFT], ["RIGHT","D-pad right",RA.RIGHT],
+    ["CROSS","Cross",RA.B], ["CIRCLE","Circle",RA.A],
+    ["SQUARE","Square",RA.Y], ["TRIANGLE","Triangle",RA.X],
+    ["L1","L1",RA.L], ["R1","R1",RA.R], ["L2","L2",RA.L2], ["R2","R2",RA.R2],
+    ["L3","L3 (stick click)",RA.L3], ["R3","R3 (stick click)",RA.R3],
+    ["SELECT","Select",RA.SELECT], ["START","Start",RA.START],
+    ["RSTICK_UP","R-stick up",RA.RS_UP], ["RSTICK_DOWN","R-stick down",RA.RS_DOWN],
+    ["RSTICK_LEFT","R-stick left",RA.RS_LEFT], ["RSTICK_RIGHT","R-stick right",RA.RS_RIGHT],
+  ],
+  atari: [
+    ["UP","Up",RA.UP], ["DOWN","Down",RA.DOWN], ["LEFT","Left",RA.LEFT], ["RIGHT","Right",RA.RIGHT],
+    ["FIRE","Fire",RA.B], ["FIRE2","Fire 2",RA.A],
+    ["OPTION1","Option 1",RA.Y], ["OPTION2","Option 2",RA.X],
+    ["SELECT","Select",RA.SELECT], ["START","Start / Reset",RA.START],
+  ],
+  arcade: [
+    ["UP","Up",RA.UP], ["DOWN","Down",RA.DOWN], ["LEFT","Left",RA.LEFT], ["RIGHT","Right",RA.RIGHT],
+    ["B1","Button 1",RA.B], ["B2","Button 2",RA.A], ["B3","Button 3",RA.Y],
+    ["B4","Button 4",RA.X], ["B5","Button 5",RA.L], ["B6","Button 6",RA.R],
+    ["COIN","Insert coin",RA.SELECT], ["START","Start",RA.START],
+  ],
+};
+
+const SYSTEM_ACTIONS = {
+  PAUSE:"Pause / resume", RESET:"Reset console", FULLSCREEN:"Fullscreen",
+  SCREENSHOT:"Screenshot", MUTE:"Mute sound",
+};
+
+const DEFAULT_BINDINGS = {
+  nes: {
+    p1: { UP:["ArrowUp","KeyW"], DOWN:["ArrowDown","KeyS"], LEFT:["ArrowLeft","KeyA"], RIGHT:["ArrowRight","KeyD"],
+          B:["KeyZ"], A:["KeyX"], SELECT:["ShiftRight"], START:["Enter"] },
+    p2: { UP:["Numpad8"], DOWN:["Numpad5"], LEFT:["Numpad4"], RIGHT:["Numpad6"],
+          B:["Numpad1"], A:["Numpad2"], SELECT:["NumpadAdd"], START:["NumpadEnter"] },
+  },
+  snes: {
+    p1: { UP:["ArrowUp"], DOWN:["ArrowDown"], LEFT:["ArrowLeft"], RIGHT:["ArrowRight"],
+          B:["KeyZ"], A:["KeyX"], Y:["KeyA"], X:["KeyS"],
+          L:["KeyQ"], R:["KeyE"], SELECT:["ShiftRight"], START:["Enter"] },
+    p2: { UP:["KeyI"], DOWN:["KeyK"], LEFT:["KeyJ"], RIGHT:["KeyL"],
+          B:["KeyN"], A:["KeyM"], Y:["KeyH"], X:["KeyU"],
+          L:["KeyY"], R:["KeyO"], SELECT:["Comma"], START:["Period"] },
+  },
+  n64: {
+    p1: { STICK_UP:["KeyW"], STICK_DOWN:["KeyS"], STICK_LEFT:["KeyA"], STICK_RIGHT:["KeyD"],
+          UP:["ArrowUp"], DOWN:["ArrowDown"], LEFT:["ArrowLeft"], RIGHT:["ArrowRight"],
+          A:["KeyX"], B:["KeyZ"], Z:["KeyC"], L:["KeyQ"], R:["KeyE"], START:["Enter"],
+          C_UP:["KeyI"], C_DOWN:["KeyK"], C_LEFT:["KeyJ"], C_RIGHT:["KeyL"] },
+    p2: { STICK_UP:[], STICK_DOWN:[], STICK_LEFT:[], STICK_RIGHT:[],
+          UP:[], DOWN:[], LEFT:[], RIGHT:[],
+          A:[], B:[], Z:[], L:[], R:[], START:[],
+          C_UP:[], C_DOWN:[], C_LEFT:[], C_RIGHT:[] },
+  },
+  psx: {
+    p1: { STICK_UP:["KeyW"], STICK_DOWN:["KeyS"], STICK_LEFT:["KeyA"], STICK_RIGHT:["KeyD"],
+          UP:["ArrowUp"], DOWN:["ArrowDown"], LEFT:["ArrowLeft"], RIGHT:["ArrowRight"],
+          CROSS:["KeyX"], CIRCLE:["KeyC"], SQUARE:["KeyZ"], TRIANGLE:["KeyV"],
+          L1:["KeyQ"], R1:["KeyE"], L2:["Digit1"], R2:["Digit3"],
+          L3:["Digit2"], R3:["Digit4"],
+          SELECT:["ShiftRight"], START:["Enter"],
+          RSTICK_UP:["KeyI"], RSTICK_DOWN:["KeyK"], RSTICK_LEFT:["KeyJ"], RSTICK_RIGHT:["KeyL"] },
+    p2: { STICK_UP:[], STICK_DOWN:[], STICK_LEFT:[], STICK_RIGHT:[],
+          UP:[], DOWN:[], LEFT:[], RIGHT:[],
+          CROSS:[], CIRCLE:[], SQUARE:[], TRIANGLE:[],
+          L1:[], R1:[], L2:[], R2:[], L3:[], R3:[],
+          SELECT:[], START:[],
+          RSTICK_UP:[], RSTICK_DOWN:[], RSTICK_LEFT:[], RSTICK_RIGHT:[] },
+  },
+  atari: {
+    p1: { UP:["ArrowUp"], DOWN:["ArrowDown"], LEFT:["ArrowLeft"], RIGHT:["ArrowRight"],
+          FIRE:["KeyZ"], FIRE2:["KeyX"], OPTION1:["KeyA"], OPTION2:["KeyS"],
+          SELECT:["ShiftRight"], START:["Enter"] },
+    p2: { UP:["KeyI"], DOWN:["KeyK"], LEFT:["KeyJ"], RIGHT:["KeyL"],
+          FIRE:["KeyN"], FIRE2:["KeyM"], OPTION1:["KeyH"], OPTION2:["KeyU"],
+          SELECT:["Comma"], START:["Period"] },
+  },
+  arcade: {
+    p1: { UP:["ArrowUp"], DOWN:["ArrowDown"], LEFT:["ArrowLeft"], RIGHT:["ArrowRight"],
+          B1:["KeyZ"], B2:["KeyX"], B3:["KeyC"], B4:["KeyA"], B5:["KeyS"], B6:["KeyD"],
+          COIN:["ShiftRight"], START:["Enter"] },
+    p2: { UP:["KeyI"], DOWN:["KeyK"], LEFT:["KeyJ"], RIGHT:["KeyL"],
+          B1:["KeyN"], B2:["KeyM"], B3:["Comma"], B4:["KeyH"], B5:["KeyU"], B6:["KeyO"],
+          COIN:["Period"], START:["Slash"] },
+  },
+  sys: { PAUSE:["KeyP"], RESET:["KeyR"], FULLSCREEN:["KeyF"], SCREENSHOT:["F2"], MUTE:["KeyM"] },
+};
+
+let bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+let nesLookup = new Map();       // only the NES core needs live key -> mask
+let capturing = null;
+let bindGroup = "p1";
+let currentSystem = "nes";
+
+function rebuildLookup() {
+  nesLookup = new Map();
+  const add = (code, entry) => {
+    if (!nesLookup.has(code)) nesLookup.set(code, { pad: [], sys: [] });
+    const slot = nesLookup.get(code);
+    if (entry.action) slot.sys.push(entry.action); else slot.pad.push(entry);
+  };
+  ["p1","p2"].forEach((g, i) => {
+    for (const [btn] of SYSTEM_BUTTONS.nes) {
+      for (const code of bindings.nes[g][btn] || []) add(code, { player: i, mask: NES_MASK[btn] });
+    }
+  });
+  for (const action in bindings.sys) {
+    for (const code of bindings.sys[action] || []) add(code, { action });
+  }
+}
+
+// which table does a (system, group) pair live in
+function tableFor(system, group) {
+  return group === "sys" ? bindings.sys : bindings[system][group];
+}
+
+// a key may only do one thing within a system; taking it frees it elsewhere
+function unbindWithin(system, code) {
+  const removed = [];
+  for (const group of ["p1","p2","sys"]) {
+    const table = tableFor(system, group);
+    for (const action in table) {
+      const i = table[action].indexOf(code);
+      if (i !== -1) { table[action].splice(i, 1); removed.push({ group, action }); }
+    }
+  }
+  return removed;
+}
+
+function keyLabel(code) {
+  const map = {
+    ArrowUp:"↑", ArrowDown:"↓", ArrowLeft:"←", ArrowRight:"→",
+    Enter:"Enter", NumpadEnter:"Num Enter", Space:"Space", Escape:"Esc",
+    ShiftLeft:"Left Shift", ShiftRight:"Right Shift",
+    ControlLeft:"Left Ctrl", ControlRight:"Right Ctrl",
+    AltLeft:"Left Alt", AltRight:"Right Alt", Tab:"Tab", Backspace:"Backspace",
+    NumpadAdd:"Num +", NumpadSubtract:"Num −", NumpadMultiply:"Num ×",
+    NumpadDivide:"Num ÷", NumpadDecimal:"Num .",
+    Comma:",", Period:".", Slash:"/", Semicolon:";", Quote:"'",
+    BracketLeft:"[", BracketRight:"]", Backslash:"\\",
+    Minus:"−", Equal:"=", Backquote:"`",
+  };
+  if (!code) return "—";
+  if (map[code]) return map[code];
+  if (code.startsWith("Key")) return code.slice(3);
+  if (code.startsWith("Digit")) return code.slice(5);
+  if (code.startsWith("Numpad")) return "Num " + code.slice(6);
+  return code;
+}
+
+// KeyboardEvent.code -> the key names EmulatorJS expects in EJS_defaultControls
+function ejsKeyName(code) {
+  const map = {
+    ArrowUp:"up arrow", ArrowDown:"down arrow", ArrowLeft:"left arrow", ArrowRight:"right arrow",
+    Enter:"enter", NumpadEnter:"enter", Space:"space", Tab:"tab", Backspace:"backspace",
+    ShiftLeft:"shift", ShiftRight:"shift", ControlLeft:"ctrl", ControlRight:"ctrl",
+    AltLeft:"alt", AltRight:"alt", Escape:"esc",
+    NumpadAdd:"add", NumpadSubtract:"subtract", NumpadMultiply:"multiply", NumpadDivide:"divide",
+    Comma:",", Period:".", Slash:"/", Semicolon:";", Quote:"'",
+    BracketLeft:"[", BracketRight:"]", Backslash:"\\", Minus:"-", Equal:"=", Backquote:"`",
+  };
+  if (map[code]) return map[code];
+  if (code.startsWith("Key")) return code.slice(3).toLowerCase();
+  if (code.startsWith("Digit")) return code.slice(5);
+  return null;                    // not expressible — caller reports it
+}
+
+// Build the table the libretro cores consume. Returns { controls, skipped[] }.
+function buildEjsControls(system) {
+  const controls = { 0:{}, 1:{}, 2:{}, 3:{} };
+  const skipped = [];
+  ["p1","p2"].forEach((group, player) => {
+    for (const [btn, label, index] of SYSTEM_BUTTONS[system]) {
+      const codes = bindings[system][group][btn] || [];
+      const names = [];
+      for (const code of codes) {
+        const n = ejsKeyName(code);
+        if (n) names.push(n);
+        else skipped.push({ label, key: keyLabel(code), player: player + 1 });
+      }
+      controls[player][index] = {
+        value: names[0] || "",
+        value2: player === 0 ? (RA_GAMEPAD[index] || "") : "",
+      };
+    }
+  });
+  return { controls, skipped };
+}
+
+function actionLabel(system, group, action) {
+  if (group === "sys") return SYSTEM_ACTIONS[action];
+  const found = SYSTEM_BUTTONS[system].find(b => b[0] === action);
+  return found ? found[1] : action;
+}
+
+function renderBindings() {
+  const host = $("bindings");
+  if (!host) return;
+  host.innerHTML = "";
+  const table = tableFor(currentSystem, bindGroup);
+  const actions = bindGroup === "sys"
+    ? Object.keys(SYSTEM_ACTIONS)
+    : SYSTEM_BUTTONS[currentSystem].map(b => b[0]);
+
+  for (const action of actions) {
+    const label = actionLabel(currentSystem, bindGroup, action);
+    const row = document.createElement("div");
+    row.className = "bind-row";
+
+    const name = document.createElement("b");
+    name.textContent = label;
+    row.appendChild(name);
+
+    const keys = document.createElement("div");
+    keys.className = "bind-keys";
+    const list = table[action] || [];
+    if (list.length === 0) {
+      const none = document.createElement("span");
+      none.className = "kbd kbd-empty";
+      none.textContent = "unassigned";
+      keys.appendChild(none);
+    }
+    list.forEach(code => {
+      const k = document.createElement("button");
+      k.type = "button";
+      k.className = "kbd";
+      k.textContent = keyLabel(code);
+      k.title = "Remove";
+      k.setAttribute("aria-label", "Remove " + keyLabel(code) + " from " + label);
+      k.addEventListener("click", () => {
+        const i = table[action].indexOf(code);
+        if (i !== -1) table[action].splice(i, 1);
+        rebuildLookup(); renderBindings();
+        bindStatus("Removed " + keyLabel(code) + " from " + label + ".");
+      });
+      keys.appendChild(k);
+    });
+    row.appendChild(keys);
+
+    const listening = capturing && capturing.group === bindGroup && capturing.action === action;
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "ctl bind-add" + (listening ? " listening" : "");
+    add.textContent = listening ? "Press a key…" : "Add key";
+    add.addEventListener("click", () => {
+      capturing = listening ? null : { system: currentSystem, group: bindGroup, action, label };
+      renderBindings();
+      bindStatus(capturing
+        ? "Listening — press any key to assign it to " + label + ". Esc cancels."
+        : "Cancelled.");
+    });
+    row.appendChild(add);
+    host.appendChild(row);
+  }
+
+  const note = $("bind-scope");
+  if (note) {
+    note.textContent = bindGroup === "sys"
+      ? "System keys are shared across all three tabs."
+      : "These apply to the " + ({nes:"NES", snes:"SNES", n64:"N64"})[currentSystem] +
+        " tab only. Each system keeps its own layout.";
+  }
+}
+
+function bindStatus(msg) { const el = $("bind-status"); if (el) el.textContent = msg || ""; }
+
+function assignCapturedKey(code) {
+  const { system, group, action, label } = capturing;
+  const stolen = unbindWithin(system, code).filter(s => !(s.group === group && s.action === action));
+  const table = tableFor(system, group);
+  if (!table[action]) table[action] = [];
+  table[action].push(code);
+  capturing = null;
+  rebuildLookup();
+  renderBindings();
+  if (stolen.length) {
+    const s = stolen[0];
+    bindStatus(keyLabel(code) + " now controls " + label + ", taken from " +
+      (s.group === "sys" ? "System " : s.group === "p1" ? "Player 1 " : "Player 2 ") +
+      actionLabel(system, s.group, s.action) + ".");
+  } else {
+    bindStatus(keyLabel(code) + " now controls " + label + ".");
+  }
+  if (typeof onBindingsChanged === "function") onBindingsChanged();
+}
+
+function resetBindings() {
+  bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+  capturing = null;
+  rebuildLookup(); renderBindings();
+  bindStatus("Restored the default layout for every system.");
+  if (typeof onBindingsChanged === "function") onBindingsChanged();
+}
+
+function exportBindings() {
+  const blob = new Blob([JSON.stringify(bindings, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "controls.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  bindStatus("Saved controls.json to your downloads.");
+}
+
+function importBindings(file) {
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const parsed = JSON.parse(r.result);
+      const next = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+      for (const system of ["nes","snes","n64","psx","atari","arcade"]) {
+        if (!parsed[system]) continue;
+        for (const group of ["p1","p2"]) {
+          if (!parsed[system][group]) continue;
+          for (const action in next[system][group]) {
+            const v = parsed[system][group][action];
+            if (Array.isArray(v)) next[system][group][action] = v.filter(x => typeof x === "string");
+          }
+        }
+      }
+      if (parsed.sys) {
+        for (const action in next.sys) {
+          const v = parsed.sys[action];
+          if (Array.isArray(v)) next.sys[action] = v.filter(x => typeof x === "string");
+        }
+      }
+      bindings = next;
+      rebuildLookup(); renderBindings();
+      bindStatus("Loaded controls from " + file.name + ".");
+      if (typeof onBindingsChanged === "function") onBindingsChanged();
+    } catch (e) {
+      bindStatus("That file isn't a valid controls file.");
+    }
+  };
+  r.readAsText(file);
+}
+// ---------------------------------------------------------------- libretro cores
+// SNES and N64 run on RetroArch cores (snes9x, mupen64plus_next) compiled to
+// WebAssembly and loaded through EmulatorJS. Each core gets its own iframe so its
+// globals, canvas and audio context stay out of the NES emulator's way. The ROM
+// never leaves the browser: it is handed to the frame as an ArrayBuffer over
+// postMessage, and the frame turns it into a local blob URL.
+
+// Core files are fetched from a CDN. cdn.emulatorjs.org is the official one, but
+// it is not always reachable — some networks and DNS providers block it, and it
+// has its own outages. So we try a list of sources in order and use whichever
+// answers first. "local" refers to a data/ folder sitting next to this file.
+const CORE_SOURCES = [
+  { id: "official", name: "EmulatorJS CDN", path: "https://cdn.emulatorjs.org/stable/data/" },
+  { id: "jsdelivr", name: "jsDelivr mirror", path: "https://cdn.jsdelivr.net/npm/@emulatorjs/emulatorjs@4.2.3/data/" },
+  { id: "local", name: "Local data/ folder", path: "data/" },
+];
+const SOURCE_TIMEOUT = 12000;
+
+// Which sources to attempt, honouring the picker in each panel.
+function sourceList(system) {
+  const choice = $("source-" + system) ? $("source-" + system).value : "auto";
+  if (choice === "custom") {
+    let p = ($("custompath-" + system).value || "").trim();
+    if (p && !p.endsWith("/")) p += "/";
+    return p ? [{ id: "custom", name: "Custom path", path: p }] : CORE_SOURCES.slice();
+  }
+  if (choice !== "auto") {
+    const one = CORE_SOURCES.find(s => s.id === choice);
+    if (one) return [one];
+  }
+  return CORE_SOURCES.slice();
+}
+
+const SYSTEM_INFO = {
+  snes: {
+    core: "snes",
+    coreName: "snes9x",
+    label: "Super Nintendo",
+    accept: ".sfc,.smc,.fig,.swc,.zip,.7z",
+    hint: "Drop a .sfc or .smc file here, or tap to browse.",
+  },
+  n64: {
+    core: "n64",
+    coreName: "mupen64plus_next",
+    label: "Nintendo 64",
+    accept: ".z64,.n64,.v64,.zip,.7z",
+    hint: "Drop a .z64, .n64 or .v64 file here, or tap to browse.",
+  },
+  psx: {
+    core: "psx",
+    coreName: "pcsx_rearmed",
+    label: "PlayStation",
+    accept: ".cue,.bin,.chd,.pbp,.iso,.img,.m3u,.exe,.zip,.7z",
+    hint: "Drop a .chd or .pbp, or select a .cue with its .bin tracks together.",
+    multi: true,
+    bios: true,
+  },
+  atari: {
+    label: "Atari",
+    coreName: "stella2014",
+    hint: "Drop a cartridge dump here, or tap to browse.",
+    // Each Atari machine is a separate core, so the panel picks one.
+    machines: [
+      { id: "a2600", name: "Atari 2600", core: "atari2600", coreName: "stella2014", accept: ".a26,.bin,.zip,.7z" },
+      { id: "a5200", name: "Atari 5200", core: "atari5200", coreName: "a5200",      accept: ".a52,.bin,.zip,.7z" },
+      { id: "a7800", name: "Atari 7800", core: "atari7800", coreName: "prosystem",  accept: ".a78,.bin,.zip,.7z" },
+      { id: "lynx",  name: "Atari Lynx", core: "lynx",      coreName: "handy",      accept: ".lnx,.o,.zip,.7z" },
+      { id: "jaguar",name: "Atari Jaguar", core: "jaguar",  coreName: "virtualjaguar", accept: ".j64,.jag,.rom,.abs,.cof,.zip" },
+    ],
+  },
+  arcade: {
+    label: "Arcade",
+    coreName: "fbneo",
+    hint: "Drop a romset .zip here, or tap to browse.",
+    machines: [
+      { id: "fbneo",    name: "FinalBurn Neo", core: "arcade",   coreName: "fbneo",         accept: ".zip,.7z" },
+      { id: "mame2003", name: "MAME 2003-Plus", core: "mame2003", coreName: "mame2003_plus", accept: ".zip,.7z" },
+    ],
+  },
+};
+
+const CORE_SYSTEMS = ["snes", "n64", "psx", "atari", "arcade"];
+
+// Which machine a family panel is currently set to.
+function machineFor(system) {
+  const info = SYSTEM_INFO[system];
+  if (!info.machines) return info;
+  const sel = $("machine-" + system);
+  const id = sel ? sel.value : info.machines[0].id;
+  return info.machines.find(m => m.id === id) || info.machines[0];
+}
+
+const frames = { snes: null, n64: null, psx: null, atari: null, arcade: null };
+const loadedRom = { snes: null, n64: null, psx: null, atari: null, arcade: null };
+const loadedBios = { psx: null };
+
+function ejsStatus(system, text, kind) {
+  const el = $("status-" + system);
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "ejs-status" + (kind ? " " + kind : "");
+  el.hidden = !text;
+}
+
+// The document that runs inside the iframe.
+function frameDocument() {
+  return [
+    "<!DOCTYPE html><html><head><meta charset='utf-8'>",
+    "<style>html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden}",
+    "#game{width:100%;height:100%}</style></head><body>",
+    "<div id='game'></div><script>",
+    // Some hosts expose only part of the console object. EmulatorJS logs freely
+    // during core loading, so fill in any missing methods before it runs.
+    "(function(){var c=window.console=window.console||{};",
+    "['log','info','warn','error','debug','trace','group','groupEnd','table','dir','time','timeEnd','assert','count']",
+    ".forEach(function(m){if(typeof c[m]!=='function')c[m]=function(){};});})();",
+    "var post=function(t,d){var m=d||{};m.__ejsFrame=true;m.type=t;parent.postMessage(m,'*');};",
+    // Cores emit noise that isn't fatal — wake lock refusals, audio warnings,
+    // WebGL context chatter. Only surface something that actually stops the game.
+    "var booted=false;",
+    "var benign=/wakelock|wake lock|screen-wake-lock|permissions policy|NotAllowedError|AbortError|play\\(\\) request|user (didn't|did not) interact/i;",
+    "var report=function(msg){ msg=msg||'unknown error';",
+    "  if(benign.test(msg)) return;",
+    "  post('error',{message:msg,fatal:!booted}); };",
+    "window.addEventListener('error',function(e){report(e.message);});",
+    "window.addEventListener('unhandledrejection',function(e){",
+    "  report((e.reason&&(e.reason.message||e.reason))+'');});",
+    "window.addEventListener('message',function(ev){",
+    "  var d=ev.data; if(!d||d.__ejsStart!==true) return;",
+    "  try{",
+    // The host page may forbid the gamepad API. EmulatorJS polls it, so replace
+    // it with a harmless stub rather than let a SecurityError kill the core.
+    "    try{ navigator.getGamepads(); }catch(gpErr){",
+    "      try{ Object.defineProperty(navigator,'getGamepads',",
+    "        {value:function(){return [];},configurable:true,writable:true}); }catch(ignored){}",
+    "      post('nogamepad');",
+    "    }",
+    "    window.EJS_player='#game';",
+    "    window.EJS_core=d.core;",
+    "    window.EJS_gameUrl=URL.createObjectURL(new Blob([d.rom]));",
+    "    if(d.bios) window.EJS_biosUrl=URL.createObjectURL(new Blob([d.bios]));",
+    "    window.EJS_gameName=d.name;",
+    "    window.EJS_startOnLoaded=true;",
+    "    window.EJS_backgroundColor='#0C0E15';",
+    "    window.EJS_color='#EA9E22';",
+    "    window.EJS_alignStartButton='center';",
+    "    if(d.controls) window.EJS_defaultControls=d.controls;",
+    "    window.EJS_ready=function(){booted=true;post('ready');};",
+    "    window.EJS_onGameStart=function(){booted=true;post('running');};",
+    // Walk the source list until one of them serves loader.js.
+    "    var srcs=d.sources||[], idx=0, timer=null;",
+    "    var attempt=function(){",
+    "      if(idx>=srcs.length){post('error',{message:'network'});return;}",
+    "      var src=srcs[idx];",
+    "      window.EJS_pathtodata=src.path;",
+    "      post('trying',{name:src.name,index:idx,total:srcs.length});",
+    "      var s=document.createElement('script'), done=false;",
+    "      var give=function(){ if(done)return; done=true; clearTimeout(timer);",
+    "        try{s.parentNode&&s.parentNode.removeChild(s);}catch(ig){}",
+    "        idx++; attempt(); };",
+    "      s.onload=function(){ if(done)return; done=true; clearTimeout(timer);",
+    "        post('loading',{name:src.name}); };",
+    "      s.onerror=give;",
+    "      timer=setTimeout(give, d.timeout||12000);",
+    "      s.src=src.path+'loader.js';",
+    "      document.body.appendChild(s);",
+    "    };",
+    "    attempt();",
+    "  }catch(err){post('error',{message:err.message});}",
+    "});",
+    "post('framereADY'.toLowerCase());",
+    "<\/script></body></html>",
+  ].join("");
+}
+
+function tearDownFrame(system) {
+  const host = $("frame-" + system);
+  if (host) host.innerHTML = "";
+  frames[system] = null;
+}
+
+function launchCore(system, romBuffer, name) {
+  const info = SYSTEM_INFO[system];
+  const machine = machineFor(system);
+  tearDownFrame(system);
+
+  const host = $("frame-" + system);
+  const frame = document.createElement("iframe");
+  frame.className = "ejs-frame";
+  frame.title = info.label + " emulator";
+  frame.allow = "autoplay; gamepad; fullscreen; screen-wake-lock; cross-origin-isolated";
+  frame.setAttribute("allowfullscreen", "true");
+  frame.srcdoc = frameDocument();
+  host.appendChild(frame);
+  frames[system] = frame;
+
+  document.body.classList.add("loaded-" + system);
+  ejsStatus(system, "Starting the " + machine.coreName + " core…", "wait");
+
+  const built = buildEjsControls(system);
+  const sources = sourceList(system);
+  let started = false;
+  let noGamepad = false;
+  let attempted = [];
+
+  const onMessage = (ev) => {
+    const d = ev.data;
+    if (!d || d.__ejsFrame !== true) return;
+    if (ev.source !== frame.contentWindow) return;
+
+    if (d.type === "frameready" && !started) {
+      started = true;
+      const copy = romBuffer.slice(0);
+      const transfer = [copy];
+      const msg = {
+        __ejsStart: true,
+        core: machine.core,
+        sources,
+        timeout: SOURCE_TIMEOUT,
+        rom: copy,
+        name,
+        controls: built.controls,
+      };
+      const bios = loadedBios[system];
+      if (bios) { msg.bios = bios.buffer.slice(0); transfer.push(msg.bios); }
+      frame.contentWindow.postMessage(msg, "*", transfer);
+    } else if (d.type === "nogamepad") {
+      noGamepad = true;
+    } else if (d.type === "trying") {
+      attempted.push(d.name);
+      ejsStatus(system, "Trying " + d.name + " (" + (d.index + 1) + " of " + d.total + ")…", "wait");
+    } else if (d.type === "loading") {
+      ejsStatus(system, "Reached " + d.name + ". Downloading the " + machine.coreName +
+        " core — a few megabytes the first time, then it's cached.", "wait");
+    } else if (d.type === "ready") {
+      let msg = "Core loaded. Press Start Game.";
+      if (noGamepad) {
+        msg += " Controllers are blocked by this page's permissions policy, so keyboard only here — opening the downloaded file directly restores gamepad support.";
+      }
+      if (built.skipped.length) {
+        const s = built.skipped[0];
+        msg += " Note: " + s.key + " can't be sent to this core, so " +
+               s.label + " is unbound here — pick a letter, digit or arrow key instead.";
+      }
+      ejsStatus(system, msg, "ok");
+    } else if (d.type === "running") {
+      ejsStatus(system, name + " is running.", "ok");
+    } else if (d.type === "error") {
+      if (d.fatal === false) return;      // core is already running; noise, not failure
+      window.removeEventListener("message", onMessage);
+      if (d.message === "network") {
+        ejsStatus(system,
+          "None of the core sources responded (tried: " + attempted.join(", ") + "). " +
+          "Your network appears to be blocking them, or they're down. Pick a different source below, " +
+          "or run fully offline: download the EmulatorJS release, put its data folder next to this file, " +
+          "choose Local data/ folder, and serve the folder over http rather than opening it from file://.", "bad");
+      } else {
+        ejsStatus(system, "The core failed to start: " + d.message, "bad");
+      }
+    }
+  };
+
+  window.addEventListener("message", onMessage);
+
+  setTimeout(() => {
+    if (!started) {
+      ejsStatus(system, "The emulator frame didn't respond. Your browser may be blocking framed scripts on this page; try downloading the file and opening it directly.", "bad");
+    }
+  }, 8000);
+}
+
+// Read a FileList fully into memory, preserving order.
+function readAllFiles(list) {
+  return Promise.all(Array.from(list).map(file => new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve({ name: file.name, data: new Uint8Array(r.result) });
+    r.onerror = () => reject(new Error("Couldn't read " + file.name));
+    r.readAsArrayBuffer(file);
+  })));
+}
+
+const DISC_NAME_RE = /\.(cue|bin|chd|pbp|iso|img|m3u|exe|sfc|smc|fig|swc|z64|n64|v64|zip|7z)$/i;
+
+function handleCoreFiles(system, list) {
+  if (!list || !list.length) return;
+  const info = SYSTEM_INFO[system];
+
+  // A single file is used as-is. Several files — the usual .cue plus .bin
+  // tracks — get bundled into one archive, because a core takes one file.
+  if (list.length === 1 || !info.multi) {
+    const file = list[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const name = file.name.replace(DISC_NAME_RE, "");
+      loadedRom[system] = { buffer: reader.result, name };
+      $("romname-" + system).textContent = name;
+      $("relaunch-" + system).disabled = false;
+      launchCore(system, reader.result, name);
+    };
+    reader.onerror = () => ejsStatus(system, "Couldn't read that file.", "bad");
+    reader.readAsArrayBuffer(file);
+    return;
+  }
+
+  ejsStatus(system, "Bundling " + list.length + " files into one image…", "wait");
+  readAllFiles(list).then(files => {
+    // Name the bundle after the .cue or .m3u if there is one; that's the file
+    // the core will look for inside the archive.
+    const index = files.find(f => /\.(cue|m3u)$/i.test(f.name));
+    const name = (index ? index.name : files[0].name).replace(DISC_NAME_RE, "");
+    const zip = buildZip(files);
+    const total = files.reduce((n, f) => n + f.data.length, 0);
+    loadedRom[system] = { buffer: zip.buffer, name };
+    $("romname-" + system).textContent = name;
+    $("relaunch-" + system).disabled = false;
+    ejsStatus(system, "Bundled " + files.length + " files (" +
+      (total / 1048576).toFixed(1) + " MB). Starting core…", "wait");
+    launchCore(system, zip.buffer, name);
+  }).catch(err => ejsStatus(system, err.message, "bad"));
+}
+
+function handleBiosFile(system, file) {
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    loadedBios[system] = { buffer: r.result, name: file.name };
+    const label = $("biosname-" + system);
+    if (label) label.textContent = file.name;
+    ejsStatus(system, loadedRom[system]
+      ? "BIOS loaded. Press Restart core to use it."
+      : "BIOS loaded. Insert a disc to start.", "ok");
+  };
+  r.onerror = () => ejsStatus(system, "Couldn't read that BIOS file.", "bad");
+  r.readAsArrayBuffer(file);
+}
+
+function relaunch(system) {
+  const r = loadedRom[system];
+  if (r) launchCore(system, r.buffer, r.name);
+}
+
+// Rebuilding controls requires restarting the core, so offer rather than force it.
+function onBindingsChanged() {
+  for (const system of CORE_SYSTEMS) {
+    if (loadedRom[system] && frames[system] && currentSystem === system) {
+      ejsStatus(system, "Control changes apply the next time the core starts — press Restart core.", "wait");
+    }
+  }
+}
+
+function wireCorePanel(system) {
+  const info = SYSTEM_INFO[system];
+  const slot = $("slot-" + system);
+  const input = $("file-" + system);
+  input.setAttribute("accept", machineFor(system).accept || info.accept || "");
+  if (info.multi) input.setAttribute("multiple", "multiple");
+
+  // Family panels (Atari, Arcade) switch cores; the accepted extensions and the
+  // core label follow the choice.
+  const machineSel = $("machine-" + system);
+  if (machineSel) {
+    machineSel.addEventListener("change", () => {
+      const m = machineFor(system);
+      input.setAttribute("accept", m.accept || "");
+      const label = $("corename-" + system);
+      if (label) label.textContent = m.coreName;
+      if (loadedRom[system]) {
+        ejsStatus(system, "Machine changed to " + m.name + " — press Restart core to reload on it.", "wait");
+      } else {
+        ejsStatus(system, "");
+      }
+    });
+    const label = $("corename-" + system);
+    if (label) label.textContent = machineFor(system).coreName;
+  }
+
+  slot.addEventListener("click", () => input.click());
+  input.addEventListener("change", (e) => handleCoreFiles(system, e.target.files));
+  ["dragenter","dragover"].forEach(ev =>
+    slot.addEventListener(ev, (e) => { e.preventDefault(); slot.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev =>
+    slot.addEventListener(ev, (e) => { e.preventDefault(); slot.classList.remove("over"); }));
+  slot.addEventListener("drop", (e) => handleCoreFiles(system, e.dataTransfer.files));
+
+  const biosBtn = $("biosbtn-" + system);
+  if (biosBtn) {
+    const biosInput = $("bios-" + system);
+    biosBtn.addEventListener("click", () => biosInput.click());
+    biosInput.addEventListener("change", (e) => handleBiosFile(system, e.target.files[0]));
+  }
+
+  $("relaunch-" + system).addEventListener("click", () => relaunch(system));
+
+  const picker = $("source-" + system);
+  const custom = $("custompath-" + system);
+  picker.addEventListener("change", () => {
+    custom.hidden = picker.value !== "custom";
+    if (picker.value === "custom") custom.focus();
+    if (loadedRom[system]) {
+      ejsStatus(system, "Source changed — press Restart core to try it.", "wait");
+    }
+  });
+  custom.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && loadedRom[system]) relaunch(system);
+  });
+
+  $("eject-" + system).addEventListener("click", () => {
+    tearDownFrame(system);
+    loadedRom[system] = null;
+    document.body.classList.remove("loaded-" + system);
+    $("romname-" + system).textContent = "—";
+    $("relaunch-" + system).disabled = true;
+    ejsStatus(system, "");
+  });
+}
+// ---------------------------------------------------------------- NES front end
+const canvas = $("screen");
+const ctx = canvas.getContext("2d", { alpha: false });
+ctx.imageSmoothingEnabled = false;
+const image = ctx.createImageData(256, 240);
+const image32 = new Uint32Array(image.data.buffer);
+
+let nes = null;
+let running = false;
+let audioCtx = null, audioNode = null, gainNode = null;
+let muted = false;
+let paletteCells = [];
+
+function buildPaletteStrip() {
+  const strip = $("palette");
+  strip.innerHTML = "";
+  paletteCells = [];
+  for (let i = 0; i < 32; i++) {
+    const cell = document.createElement("div");
+    cell.className = "swatch" + (i % 4 === 0 ? " swatch-mirror" : "");
+    strip.appendChild(cell);
+    paletteCells.push(cell);
+  }
+}
+function updatePaletteStrip() {
+  if (!nes) return;
+  for (let i = 0; i < 32; i++) {
+    const rgb = NES_PALETTE[nes.ppu.palette[i] & 0x3F];
+    paletteCells[i].style.background = "#" + rgb.toString(16).padStart(6, "0");
+  }
+}
+
+function initAudio() {
+  if (audioCtx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AC({ sampleRate: 44100 });
+  if (nes) nes.apu.sampleRate = audioCtx.sampleRate;
+  gainNode = audioCtx.createGain();
+  gainNode.gain.value = $("volume").value / 100;
+  audioNode = audioCtx.createScriptProcessor(2048, 0, 1);
+  audioNode.onaudioprocess = (e) => {
+    const out = e.outputBuffer.getChannelData(0);
+    if (nes && !muted && running) nes.apu.fill(out);
+    else out.fill(0);
+  };
+  audioNode.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+}
+
+let lastStat = 0;
+function loop() {
+  if (!running || !nes) return;
+  requestAnimationFrame(loop);
+
+  const queued = nes.apu.available();
+  let frameCount = 1;
+  if (queued > 3500) frameCount = 0;
+  else if (queued < 900) frameCount = 2;
+
+  for (let f = 0; f < frameCount; f++) {
+    try { nes.runFrame(); }
+    catch (err) { running = false; showError("The emulator stopped: " + err.message); return; }
+  }
+
+  if (frameCount > 0) {
+    image32.set(nes.ppu.frameBuffer);
+    ctx.putImageData(image, 0, 0);
+    updatePaletteStrip();
+  }
+
+  const now = performance.now();
+  if (now - lastStat > 500) {
+    lastStat = now;
+    $("stat-frames").textContent = nes.ppu.frameCount.toLocaleString();
+  }
+}
+
+function start() {
+  if (!nes) return;
+  initAudio();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  running = true;
+  $("btn-play").textContent = "Pause";
+  requestAnimationFrame(loop);
+}
+function pause() { running = false; $("btn-play").textContent = "Resume"; }
+function togglePlay() { running ? pause() : start(); }
+
+function loadRom(bytes, name) {
+  try { nes = new NES(bytes); }
+  catch (err) { showError(err.message); return; }
+  hideError();
+  document.body.classList.add("loaded-nes");
+  buildPaletteStrip();
+  $("rom-name").textContent = name;
+  $("stat-mapper").textContent = (MAPPER_NAMES[nes.cart.mapperNum] || "?") + " (" + nes.cart.mapperNum + ")";
+  $("stat-prg").textContent = (nes.cart.prg.length / 1024) + " KB";
+  $("stat-chr").textContent = nes.cart.usesChrRam ? "8 KB RAM" : (nes.cart.chr.length / 1024) + " KB";
+  $("stat-mirror").textContent = ["Horizontal","Vertical","Single 0","Single 1","Four-screen"][nes.mapper.mirroring];
+  $("stat-battery").textContent = nes.cart.battery ? "Yes" : "No";
+  $("stat-frames").textContent = "0";
+  $("btn-save").disabled = !nes.cart.battery;
+  $("btn-loadsave").disabled = !nes.cart.battery;
+  start();
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => loadRom(reader.result, file.name.replace(/\.nes$/i, ""));
+  reader.onerror = () => showError("Couldn't read that file. Try again.");
+  reader.readAsArrayBuffer(file);
+}
+
+function showError(msg) { const e = $("error"); e.textContent = msg; e.hidden = false; }
+function hideError() { $("error").hidden = true; }
+
+function downloadSave() {
+  if (!nes) return;
+  const blob = new Blob([nes.cart.prgRam], { type: "application/octet-stream" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = ($("rom-name").textContent || "game") + ".sav";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function loadSaveFile(file) {
+  if (!nes || !file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const d = new Uint8Array(r.result);
+    nes.cart.prgRam.set(d.subarray(0, Math.min(d.length, 8192)));
+    nes.reset();
+  };
+  r.readAsArrayBuffer(file);
+}
+function screenshot() {
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = ($("rom-name").textContent || "nes") + ".png";
+  a.click();
+}
+function toggleMute() {
+  muted = !muted;
+  $("btn-mute").textContent = muted ? "Sound off" : "Sound on";
+  $("btn-mute").setAttribute("aria-pressed", String(muted));
+}
+
+// ---- fullscreen, uniform across all three tabs. The NES fullscreens its canvas
+// wrapper; the core tabs fullscreen the box holding the iframe, so the core's own
+// toolbar comes along with it.
+function fullscreenTarget(system) {
+  return system === "nes" ? $("tv-nes") : $("stage-" + system);
+}
+
+function toggleFullscreen(system) {
+  const el = fullscreenTarget(system);
+  if (!el) return;
+  const doc = document;
+  const active = doc.fullscreenElement || doc.webkitFullscreenElement;
+  try {
+    if (active) {
+      (doc.exitFullscreen || doc.webkitExitFullscreen).call(doc);
+    } else {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (!req) return;
+      const r = req.call(el);
+      if (r && r.catch) r.catch(() => {});   // user gesture or permission refused
+    }
+  } catch (err) { /* not available in this context */ }
+}
+
+// ---- input (NES core only; the libretro frames handle their own keyboard)
+let padState = [0, 0];
+function applyPad() { if (nes) { nes.setButtons(0, padState[0]); nes.setButtons(1, padState[1]); } }
+
+function runSystemAction(action) {
+  switch (action) {
+    case "PAUSE": if (currentSystem === "nes") togglePlay(); break;
+    case "RESET": if (currentSystem === "nes" && nes) nes.reset();
+                  else if (loadedRom[currentSystem]) relaunch(currentSystem); break;
+    case "SCREENSHOT": if (currentSystem === "nes") screenshot(); break;
+    case "MUTE": if (currentSystem === "nes") toggleMute(); break;
+    case "FULLSCREEN": toggleFullscreen(currentSystem); break;
+  }
+}
+
+window.addEventListener("keydown", (e) => {
+  if (capturing) {
+    e.preventDefault();
+    if (e.code === "Escape") { capturing = null; renderBindings(); bindStatus("Cancelled."); return; }
+    assignCapturedKey(e.code);
+    return;
+  }
+  const slot = nesLookup.get(e.code);
+  if (!slot) return;
+  if (currentSystem === "nes" && slot.pad.length) {
+    e.preventDefault();
+    slot.pad.forEach(({ player, mask }) => { padState[player] |= mask; });
+    applyPad();
+  }
+  if (!e.repeat && slot.sys.length) {
+    e.preventDefault();
+    slot.sys.forEach(runSystemAction);
+  }
+});
+
+window.addEventListener("keyup", (e) => {
+  const slot = nesLookup.get(e.code);
+  if (!slot || !slot.pad.length) return;
+  slot.pad.forEach(({ player, mask }) => { padState[player] &= ~mask; });
+  applyPad();
+});
+
+window.addEventListener("blur", () => { padState = [0, 0]; applyPad(); });
+
+function bindTouch(el, mask) {
+  const down = (e) => { e.preventDefault(); padState[0] |= mask; applyPad(); el.classList.add("held"); };
+  const up = (e) => { e.preventDefault(); padState[0] &= ~mask; applyPad(); el.classList.remove("held"); };
+  el.addEventListener("touchstart", down, { passive:false });
+  el.addEventListener("touchend", up, { passive:false });
+  el.addEventListener("touchcancel", up, { passive:false });
+  el.addEventListener("mousedown", down);
+  el.addEventListener("mouseup", up);
+  el.addEventListener("mouseleave", up);
+}
+
+// Some embeddings (sandboxed iframes, strict permissions policies) refuse
+// getGamepads outright. Detect that once and stop asking rather than throwing
+// every frame — keyboard and touch input carry on regardless.
+let gamepadsUsable = true;
+function readGamepads() {
+  if (!gamepadsUsable || !navigator.getGamepads) return [];
+  try {
+    return navigator.getGamepads() || [];
+  } catch (err) {
+    // Blocked by a permissions policy. Nothing to report and nowhere reliable to
+    // report it — some hosts ship a partial console — so just stop polling.
+    gamepadsUsable = false;
+    return [];
+  }
+}
+
+function pollGamepads() {
+  if (!gamepadsUsable) return;          // nothing left to poll; let the loop end
+  const pads = readGamepads();
+  for (let i = 0; i < 2; i++) {
+    const p = pads && pads[i];
+    if (!p || !nes || currentSystem !== "nes") continue;
+    let s = 0;
+    const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+    const b = (n) => p.buttons[n] && p.buttons[n].pressed;
+    if (b(0)) s |= NES_MASK.A;
+    if (b(1)) s |= NES_MASK.B;
+    if (b(8)) s |= NES_MASK.SELECT;
+    if (b(9)) s |= NES_MASK.START;
+    if (b(12) || ay < -0.4) s |= NES_MASK.UP;
+    if (b(13) || ay > 0.4) s |= NES_MASK.DOWN;
+    if (b(14) || ax < -0.4) s |= NES_MASK.LEFT;
+    if (b(15) || ax > 0.4) s |= NES_MASK.RIGHT;
+    if (s) nes.setButtons(i, padState[i] | s);
+  }
+  requestAnimationFrame(pollGamepads);
+}
+
+// ---- tabs. The controls card is a single element moved into the active panel,
+// so there is one editor rather than three that could drift apart.
+function selectSystem(id) {
+  currentSystem = id;
+  document.querySelectorAll("[data-system]").forEach(btn => {
+    const on = btn.dataset.system === id;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", String(on));
+  });
+  document.querySelectorAll("[data-panel]").forEach(p => { p.hidden = p.dataset.panel !== id; });
+  if (id !== "nes" && running) pause();
+  const host = $("controls-host-" + id);
+  if (host) host.appendChild($("controls-card"));
+  if (bindGroup !== "sys") bindGroup = "p1";
+  document.querySelectorAll("[data-bindgroup]").forEach(b => {
+    const on = b.dataset.bindgroup === bindGroup;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  renderBindings();
+  bindStatus("");
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  applyBuildInfo();
+  buildPaletteStrip();
+  rebuildLookup();
+  renderBindings();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, 256, 240);
+
+  $("file").addEventListener("change", (e) => handleFile(e.target.files[0]));
+  $("savefile").addEventListener("change", (e) => loadSaveFile(e.target.files[0]));
+  $("keyfile").addEventListener("change", (e) => importBindings(e.target.files[0]));
+  $("btn-play").addEventListener("click", togglePlay);
+  $("btn-reset").addEventListener("click", () => { if (nes) nes.reset(); });
+  $("btn-shot").addEventListener("click", screenshot);
+  $("btn-fullscreen").addEventListener("click", () => toggleFullscreen("nes"));
+  $("btn-save").addEventListener("click", downloadSave);
+  $("btn-loadsave").addEventListener("click", () => $("savefile").click());
+  $("btn-mute").addEventListener("click", toggleMute);
+  $("volume").addEventListener("input", (e) => { if (gainNode) gainNode.gain.value = e.target.value / 100; });
+
+  $("btn-bind-reset").addEventListener("click", resetBindings);
+  $("btn-bind-export").addEventListener("click", exportBindings);
+  $("btn-bind-import").addEventListener("click", () => $("keyfile").click());
+  document.querySelectorAll("[data-bindgroup]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      bindGroup = btn.dataset.bindgroup;
+      capturing = null;
+      document.querySelectorAll("[data-bindgroup]").forEach(b => {
+        const on = b.dataset.bindgroup === bindGroup;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-selected", String(on));
+      });
+      renderBindings();
+      bindStatus("");
+    });
+  });
+
+  document.querySelectorAll("[data-system]").forEach(btn =>
+    btn.addEventListener("click", () => selectSystem(btn.dataset.system)));
+
+  const slot = $("slot");
+  slot.addEventListener("click", () => $("file").click());
+  ["dragenter","dragover"].forEach(ev => slot.addEventListener(ev, (e) => { e.preventDefault(); slot.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => slot.addEventListener(ev, (e) => { e.preventDefault(); slot.classList.remove("over"); }));
+  slot.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
+  document.addEventListener("dragover", (e) => e.preventDefault());
+
+  document.querySelectorAll("[data-btn]").forEach(el => bindTouch(el, NES_MASK[el.dataset.btn]));
+
+  CORE_SYSTEMS.forEach(wireCorePanel);
+  CORE_SYSTEMS.forEach(sys =>
+    $("fullscreen-" + sys).addEventListener("click", () => toggleFullscreen(sys)));
+
+  requestAnimationFrame(pollGamepads);
+});
+
+</script>
+</body>
+</html>
